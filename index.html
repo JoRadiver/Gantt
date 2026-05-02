@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gantt.IO</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<!-- Header -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">Gantt.IO</div>
+    <div class="project-name">Untitled Project</div>
+  </div>
+  <div class="header-right">
+    <div class="team-avatars">
+      <!-- Team avatars will be dynamically added here -->
+    </div>
+    <button class="action-button" id="new-project-btn">New</button>
+    <button class="action-button" id="open-project-btn">Open</button>
+    <button class="action-button" id="save-project-btn">Save</button>
+  </div>
+</header>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="toolbar-left">
+    <div class="view-switcher">
+      <button class="view-button active" data-view="gantt">Gantt</button>
+      <button class="view-button" data-view="list">List</button>
+      <button class="view-button" data-view="board">Board</button>
+    </div>
+    <div class="controls">
+      <input type="text" class="search-box" placeholder="Search...">
+      <button class="control-button">Filter</button>
+      <button class="control-button">Sort</button>
+      <button class="control-button">Group</button>
+    </div>
+  </div>
+  <div class="toolbar-right">
+    <div class="zoom-controls">
+      <button class="zoom-button" data-zoom="day">Day</button>
+      <button class="zoom-button active" data-zoom="week">Week</button>
+      <button class="zoom-button" data-zoom="month">Month</button>
+      <button class="zoom-button" data-zoom="quarter">Quarter</button>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="baseline-toggle"> Baseline
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="critical-path-toggle"> Critical Path
+    </label>
+  </div>
+</div>
+
+<!-- Main Area: Sidebar + Canvas -->
+<div class="main-area">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Tasks</h2>
+      <button class="add-task-button" id="add-task-btn">+ Add Task</button>
+    </div>
+    <div class="task-tree" id="task-tree">
+      <!-- Task tree will be dynamically rendered here -->
+    </div>
+  </aside>
+
+  <!-- Resizer -->
+  <div class="resizer" id="resizer"></div>
+
+  <!-- Canvas -->
+  <main class="canvas" id="canvas">
+    <!-- Gantt chart will be rendered here -->
+  </main>
+</div>
+
+<!-- Status Bar -->
+<footer class="status-bar">
+  <div class="status-left">
+    <span class="task-count">0 tasks</span>
+    <span class="progress">0% complete</span>
+  </div>
+  <div class="status-right">
+    <span class="zoom-level">Zoom: Week</span>
+  </div>
+</footer>
+
+<!-- Drawer (for task editing) -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h2>Edit Task</h2>
+    <button class="close-drawer" id="close-drawer-btn">×</button>
+  </div>
+  <div class="drawer-content" id="drawer-content">
+    <!-- Task editing form will be dynamically rendered here -->
+  </div>
+</div>
+
+<!-- Worklog Panel -->
+<div class="worklog-panel" id="worklog-panel">
+  <div class="worklog-header">
+    <h2>Worklog</h2>
+    <button class="close-worklog" id="close-worklog-btn">×</button>
+  </div>
+  <div class="worklog-content" id="worklog-content">
+    <!-- Worklog entries will be dynamically rendered here -->
+  </div>
+</div>
+
+<!-- Scripts -->
+<script type="module" src="src/core.js"></script>
+<script type="module" src="src/engine.js"></script>
+<script type="module" src="src/storage/interface.js"></script>
+<script type="module" src="src/storage/json.js"></script>
+<script type="module" src="src/ui/drawer.js"></script>
+<script type="module" src="src/ui/sidebar.js"></script>
+<script type="module" src="src/ui/worklog.js"></script>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

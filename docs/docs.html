@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Gantt.IO · API Reference</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #f1f5f9;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+      line-height: 1.5;
+      padding: 2rem 1.5rem;
+      color: #0f172a;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* header */
+    .doc-header {
+      margin-bottom: 2.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 1rem;
+    }
+
+    .doc-header h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      background: linear-gradient(135deg, #1e2b3c, #2c5a6e);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .doc-header p {
+      color: #334155;
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .badge-total {
+      display: inline-block;
+      background: #e9eef3;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.7rem;
+      font-weight: 500;
+      color: #1e293b;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+
+    /* grid layout for modules */
+    .modules-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .module-card {
+      background: white;
+      border-radius: 1.25rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+      border: 1px solid #e9edf2;
+    }
+
+    .module-card:hover {
+      box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.12);
+    }
+
+    .module-header {
+      background: #fafcff;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #eef2f6;
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .module-header h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      letter-spacing: -0.3px;
+      color: #0f172a;
+    }
+
+    .file-path {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      background: #eef2ff;
+      color: #1e40af;
+      padding: 0.2rem 0.7rem;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .func-count {
+      margin-left: auto;
+      font-size: 0.7rem;
+      background: #f1f5f9;
+      padding: 0.2rem 0.7rem;
+      border-radius: 20px;
+      color: #334155;
+    }
+
+    .functions-list {
+      padding: 0.75rem 0 1rem 0;
+    }
+
+    .func-item {
+      padding: 0.9rem 1.5rem;
+      border-bottom: 1px solid #f0f2f5;
+      transition: background 0.1s ease;
+    }
+
+    .func-item:last-child {
+      border-bottom: none;
+    }
+
+    .func-name {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-weight: 600;
+      font-size: 1rem;
+      color: #0c4e6e;
+      margin-bottom: 0.35rem;
+      display: inline-block;
+      background: #f8fafc;
+      padding: 0.1rem 0.4rem;
+      border-radius: 8px;
+      letter-spacing: -0.2px;
+    }
+
+    .signature {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      background: #f8fafc;
+      padding: 0.25rem 0.5rem;
+      border-radius: 12px;
+      display: inline-block;
+      color: #2c3e50;
+      margin-top: 0.2rem;
+      margin-bottom: 0.5rem;
+      word-break: break-all;
+    }
+
+    .desc {
+      font-size: 0.9rem;
+      color: #1e293b;
+      margin: 0.5rem 0 0.3rem 0;
+      line-height: 1.45;
+    }
+
+    .meta-location {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      font-size: 0.7rem;
+      color: #5b6e8c;
+      font-weight: 500;
+    }
+
+    .location-badge {
+      background: #eef2ff;
+      border-radius: 20px;
+      padding: 0.2rem 0.6rem;
+      font-family: monospace;
+    }
+
+    .placeholder-text {
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: #5c6f87;
+      font-style: italic;
+      background: #fefefe;
+      font-size: 0.9rem;
+      border-top: 1px solid #f0f2f5;
+    }
+
+    hr {
+      margin: 0.5rem 0;
+    }
+
+    footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #62748c;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1.8rem;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 1rem;
+      }
+      .module-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .func-count {
+        margin-left: 0;
+      }
+      .signature {
+        font-size: 0.75rem;
+        word-break: break-word;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="doc-header">
+    <h1>📐 Gantt.IO · API reference <span class="badge-total">8 modules</span></h1>
+    <p>Core data structures, business logic engine, storage adapters and UI components.<br>
+      <strong>core.js</strong> + <strong>engine.js</strong> fully documented. Other modules ready for definitions.</p>
+  </div>
+
+  <div class="modules-grid">
+
+    <!-- ======================= CORE.JS (fully documented) ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>📦 core.js</h2>
+        <span class="file-path">/core.js</span>
+        <span class="func-count">11 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">validatePerson</div>
+          <div class="signature">validatePerson(person: Person) → boolean</div>
+          <div class="desc">Strictly validates a <code>Person</code> object: checks id, name, initials (≤2 chars), role, color palette, optional email. Returns <code>true</code> only if all fields are correct.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span><span>🔒 exported</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">validateTask</div>
+          <div class="signature">validateTask(task: Task) → boolean</div>
+          <div class="desc">Validates a full <code>Task</code> schema: id, type, title, dates (ISO), estimated_hours, hours_spent, completion (0–1), priority, conflict_state, flexibility flags, people_ids array, etc.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">validateDependency</div>
+          <div class="signature">validateDependency(dependency: Dependency) → boolean</div>
+          <div class="desc">Checks dependency shape: id + from_task_id + to_task_id (non-empty strings) and rule must be <code>'finish_to_start'</code> or <code>'start_to_start'</code>.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">validateWorkEntry</div>
+          <div class="signature">validateWorkEntry(entry: WorkEntry) → boolean</div>
+          <div class="desc">Validates work log entry: id, task_id, person_id, valid ISO date, non‑negative hours, notes string.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">validateProject</div>
+          <div class="signature">validateProject(project: Project) → boolean</div>
+          <div class="desc">Recursively validates the entire project: meta, people array, tasks array and dependencies array using respective validators.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">defaultPerson</div>
+          <div class="signature">defaultPerson() → Person</div>
+          <div class="desc">Factory: creates a new <code>Person</code> with random UUID, name "New Person", initials "NP", role "Member" and default green colour.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">defaultTask</div>
+          <div class="signature">defaultTask() → Task</div>
+          <div class="desc">Builds a default <code>Task</code> of type 'task' with today's start/end dates, estimated_hours = 0, priority normal, no assignments, flexible end date.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">defaultDependency</div>
+          <div class="signature">defaultDependency() → Dependency</div>
+          <div class="desc">Returns an empty dependency with fresh UUID, empty from_task_id / to_task_id, rule 'finish_to_start'.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">defaultWorkEntry</div>
+          <div class="signature">defaultWorkEntry() → WorkEntry</div>
+          <div class="desc">Generates a work log entry skeleton: random ID, empty task/person IDs, today's date, hours=0, empty notes.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getColorStop</div>
+          <div class="signature">getColorStop(key: PaletteKey, variant?: 'base' | 'dim') → string</div>
+          <div class="desc">Returns hex color for given palette key (green, blue, teal, purple, amber, coral, slate, orange). Variant defaults to 'base'. Throws on invalid key.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getColorStops</div>
+          <div class="signature">getColorStops(key: PaletteKey) → { base: string, dim: string }</div>
+          <div class="desc">Retrieves both base and dim color stops for a given palette key – useful for gradients or interactive states.</div>
+          <div class="meta-location"><span class="location-badge">📍 core.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= ENGINE.JS (fully documented) ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>⚙️ engine.js</h2>
+        <span class="file-path">/engine.js</span>
+        <span class="func-count">12 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">getChildren</div>
+          <div class="signature">getChildren(taskId: string, tasks: Task[]) → Task[]</div>
+          <div class="desc">Returns direct child tasks of a given parent task ID.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getDescendants</div>
+          <div class="signature">getDescendants(taskId: string, tasks: Task[]) → Task[]</div>
+          <div class="desc">Gets all descendants (children, grandchildren, etc.) of a task recursively.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getSiblings</div>
+          <div class="signature">getSiblings(taskId: string, tasks: Task[]) → Task[]</div>
+          <div class="desc">Returns all sibling tasks sharing the same parent, excluding the task itself.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getPath</div>
+          <div class="signature">getPath(taskId: string, tasks: Task[]) → Task[]</div>
+          <div class="desc">Returns an array of ancestors from parent up to the root (task hierarchy path).</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getRootTasks</div>
+          <div class="signature">getRootTasks(tasks: Task[]) → Task[]</div>
+          <div class="desc">Filters tasks that have no parent (null parent_id).</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">rollupGroup</div>
+          <div class="signature">rollupGroup(taskId: string, tasks: Task[]) → Task | null</div>
+          <div class="desc">Aggregates descendant data (hours_spent, average completion) and returns an updated group task object.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">computeEarliestStart</div>
+          <div class="signature">computeEarliestStart(task: Task, tasks: Task[], dependencies: Dependency[]) → Date</div>
+          <div class="desc">Calculates the earliest possible start date for a task based on incoming dependencies (finish-to-start with optional lag).</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">getDependencyShift</div>
+          <div class="signature">getDependencyShift(dependency: Dependency, tasks: Task[]) → number</div>
+          <div class="desc">Returns the number of days the target task should be shifted forward to satisfy the dependency gap.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">wouldCreateCycle</div>
+          <div class="signature">wouldCreateCycle(newDependency: Dependency, dependencies: Dependency[], tasks: Task[]) → boolean</div>
+          <div class="desc">Checks whether adding a new dependency would introduce a cycle in the task dependency graph (DFS‑based).</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">aggregateByTask</div>
+          <div class="signature">aggregateByTask(entries: WorkEntry[]) → Map&lt;string, { hours_spent: number, last_entry_date: string }&gt;</div>
+          <div class="desc">Groups worklog entries by task ID, summing hours and tracking the most recent entry date.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">rebuildSnapshots</div>
+          <div class="signature">rebuildSnapshots(project: Project, worklogEntries: WorkEntry[]) → Project</div>
+          <div class="desc">Updates a project’s tasks with aggregated hours_spent and last_worklog_date from worklog entries. Returns a fresh project copy.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">resolveColor</div>
+          <div class="signature">resolveColor(task: Task, tasks: Task[], projectMeta: Project['meta']) → PaletteKey</div>
+          <div class="desc">Resolves the final colour key for a task, considering task.color, group/milestone overrides, and project default colors.</div>
+          <div class="meta-location"><span class="location-badge">📍 engine.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= APP.JS (placeholder) ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>⚙️ app.js</h2>
+        <span class="file-path">/app.js</span>
+        <span class="func-count">— pending —</span>
+      </div>
+      <div class="placeholder-text">
+        📄 No public API documented yet.<br>
+        <span style="font-size:0.8rem;">(Functions, exports or core application controller will be listed here)</span>
+      </div>
+    </div>
+
+
+    <!-- ======================= STORAGE / interface.js ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>💾 storage/interface.js</h2>
+        <span class="file-path">storage/interface.js</span>
+        <span class="func-count">4 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">loadProject</div>
+          <div class="signature">loadProject(file: FileSystemFileHandle | string) → Promise&lt;Project | null&gt;</div>
+          <div class="desc">Loads a project from the given file handle or path. Returns the parsed <code>Project</code> object, or <code>null</code> if the operation is cancelled. Abstract method – implementations (e.g., JSON adapter) provide concrete logic.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/interface.js</span><span>🔌 contract</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">saveProject</div>
+          <div class="signature">saveProject(project: Project, file: FileSystemFileHandle | string) → Promise&lt;void&gt;</div>
+          <div class="desc">Saves the project to the specified file. Throws if the operation fails. Intended to be implemented by concrete storage adapters.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/interface.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">loadWorklog</div>
+          <div class="signature">loadWorklog(file: FileSystemFileHandle | string) → Promise&lt;WorkEntry[]&gt;</div>
+          <div class="desc">Loads worklog entries (array of <code>WorkEntry</code>) from the given file handle or path. Abstract method, use with a concrete storage implementation.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/interface.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">saveWorklog</div>
+          <div class="signature">saveWorklog(entries: WorkEntry[], file: FileSystemFileHandle | string) → Promise&lt;void&gt;</div>
+          <div class="desc">Persists an array of worklog entries to the specified file. Base contract; concrete logic resides in adapters like <code>storage/json.js</code>.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/interface.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= STORAGE / json.js ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>📁 storage/json.js</h2>
+        <span class="file-path">storage/json.js</span>
+        <span class="func-count">4 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">loadProject</div>
+          <div class="signature">loadProject(file: FileSystemFileHandle | string) → Promise&lt;Project | null&gt;</div>
+          <div class="desc">Concrete JSON implementation of the storage contract. Loads a project from the given file handle or path using the File System Access API. Returns the parsed <code>Project</code> or <code>null</code> on failure/cancellation.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/json.js</span><span>🔧 implements interface</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">saveProject</div>
+          <div class="signature">saveProject(project: Project, file: FileSystemFileHandle | string) → Promise&lt;void&gt;</div>
+          <div class="desc">Serializes a project to JSON and writes it to the specified file. Uses the File System Access API; prompts for file location if a string path is provided. Throws on error.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/json.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">loadWorklog</div>
+          <div class="signature">loadWorklog(file: FileSystemFileHandle | string) → Promise&lt;WorkEntry[]&gt;</div>
+          <div class="desc">Loads worklog entries from a JSON file. Returns an array of <code>WorkEntry</code> objects, or an empty array if the operation fails.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/json.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">saveWorklog</div>
+          <div class="signature">saveWorklog(entries: WorkEntry[], file: FileSystemFileHandle | string) → Promise&lt;void&gt;</div>
+          <div class="desc">Persists an array of worklog entries to a JSON file. Handles file picking fallbacks, writes formatted JSON, and throws on errors.</div>
+          <div class="meta-location"><span class="location-badge">📍 storage/json.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= UI / drawer.js ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>🖌️ ui/drawer.js</h2>
+        <span class="file-path">ui/drawer.js</span>
+        <span class="func-count">5 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">initDrawer</div>
+          <div class="signature">initDrawer(element: HTMLElement) → void</div>
+          <div class="desc">Initialises the drawer UI module: sets up the DOM element, creates the task edit form, adds action buttons (Save, Cancel, Delete), and closes the drawer by default. Must be called once before using other drawer functions.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/drawer.js</span><span>🔓 exported</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">updateDrawerForTask</div>
+          <div class="signature">updateDrawerForTask(task: Task, project: Project) → void</div>
+          <div class="desc">Opens the drawer and populates the form with the selected task’s data. Binds title, type, dates, estimated hours, priority, assigned people, notes, manual completion, and displays existing dependencies.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/drawer.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onTaskUpdated</div>
+          <div class="signature">onTaskUpdated(updatedTask: Task) → void</div>
+          <div class="desc">Internal handler called after a successful save. Dispatches a <code>'taskUpdated'</code> custom event on <code>window</code> with the updated task as detail, allowing other modules (engine, sidebar, canvas) to react.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/drawer.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onTaskDeleted</div>
+          <div class="signature">onTaskDeleted(taskId: string) → void</div>
+          <div class="desc">Dispatches a <code>'taskDeleted'</code> custom event on <code>window</code> with the deleted task’s ID. Typically called after user confirmation inside the drawer’s delete handler.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/drawer.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">refreshDrawer</div>
+          <div class="signature">refreshDrawer(project: Project) → void</div>
+          <div class="desc">If the drawer is currently open and a task is being edited, reloads the form data using the provided project (e.g., after external changes). Useful after project-wide updates.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/drawer.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= UI / sidebar.js ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>📋 ui/sidebar.js</h2>
+        <span class="file-path">ui/sidebar.js</span>
+        <span class="func-count">5 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">initSidebar</div>
+          <div class="signature">initSidebar(element: HTMLElement) → void</div>
+          <div class="desc">Initialises the sidebar UI module: sets the container element, applies CSS class, attaches scroll event listener, and dispatches <code>'sidebarScroll'</code> events to synchronise with the canvas.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/sidebar.js</span><span>🔓 exported</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">refreshSidebar</div>
+          <div class="signature">refreshSidebar(project: Project) → void</div>
+          <div class="desc">Renders the task list as a tree with indentation, type badges, completion bars, hours, people pips, and collapse/expand toggles for groups. Resets collapsed state and applies virtualised rendering for performance.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/sidebar.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onTaskSelected</div>
+          <div class="signature">onTaskSelected(taskId: string) → void</div>
+          <div class="desc">Handles task row selection: updates internal selected ID, re‑renders the visible rows to reflect the selection highlight, and dispatches a <code>'taskSelected'</code> custom event for other modules (drawer, canvas).</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/sidebar.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onGroupToggled</div>
+          <div class="signature">onGroupToggled(taskId: string) → void</div>
+          <div class="desc">Toggles the collapsed/expanded state of a group task. Updates the internal <code>collapsedGroups</code> set and triggers a re‑render of the visible task list.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/sidebar.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">syncScroll</div>
+          <div class="signature">syncScroll(newScrollTop: number) → void</div>
+          <div class="desc">Synchronises the sidebar’s scroll position with an external value (e.g., from the canvas). Updates internal scroll state and re‑renders visible rows based on the new scroll offset.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/sidebar.js</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= UI / worklog.js ======================= -->
+    <div class="module-card">
+      <div class="module-header">
+        <h2>⏱️ ui/worklog.js</h2>
+        <span class="file-path">ui/worklog.js</span>
+        <span class="func-count">4 public functions</span>
+      </div>
+      <div class="functions-list">
+        <div class="func-item">
+          <div class="func-name">initWorklog</div>
+          <div class="signature">initWorklog(element: HTMLElement) → void</div>
+          <div class="desc">Initialises the worklog UI module: creates the quick entry form, history table, and summary panel inside the given container element. Attaches event handlers for adding entries.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/worklog.js</span><span>🔓 exported</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">refreshWorklogUI</div>
+          <div class="signature">refreshWorklogUI(entries: WorkEntry[], project: Project) → void</div>
+          <div class="desc">Renders the full worklog interface: populates the history table with all entries, updates the summary panel (hours by person / by task), and stores the current project reference.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/worklog.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onWorklogEntryAdded</div>
+          <div class="signature">onWorklogEntryAdded(entry: WorkEntry) → void</div>
+          <div class="desc">Handles addition of a new worklog entry: pushes to internal array, refreshes the UI, and dispatches a <code>'worklogEntryAdded'</code> custom event for other modules (engine, storage).</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/worklog.js</span></div>
+        </div>
+        <div class="func-item">
+          <div class="func-name">onWorklogEntryDeleted</div>
+          <div class="signature">onWorklogEntryDeleted(entryId: string) → void</div>
+          <div class="desc">Removes a worklog entry by ID, refreshes the UI, and dispatches a <code>'worklogEntryDeleted'</code> custom event for downstream modules.</div>
+          <div class="meta-location"><span class="location-badge">📍 ui/worklog.js</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <footer>
+    Gantt.IO internal API · auto-generated documentation · <strong>core.js</strong> and <strong>engine.js</strong> fully exported<br>
+    Other modules (app, storage, ui) ready to be filled with their public methods.
+  </footer>
+</div>
+</body>
+</html>

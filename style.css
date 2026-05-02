@@ -1,0 +1,383 @@
+/* ============================================================================
+   Gantt.IO - Stylesheet
+   ============================================================================ */
+
+/* CSS Variables for Theme Colors */
+:root {
+  /* Background Layers */
+  --bg-primary: #0f1117;
+  --bg-secondary: #161922;
+  --bg-tertiary: #1d2130;
+
+  /* Borders */
+  --border-primary: #2a2f42;
+  --border-secondary: #373d54;
+
+  /* Text Colors */
+  --text-primary: #d4d8e8;
+  --text-secondary: #6b7494;
+  --text-tertiary: #3e4560;
+
+  /* Accent Colors */
+  --accent-amber: #e8a23a;
+  --accent-green: #3dba74;
+  --accent-blue: #5b9cf6;
+  --accent-purple: #9f7ef5;
+  --accent-coral: #ff7f7f;
+  --accent-slate: #6b7494;
+  --accent-orange: #ffa500;
+  --accent-red: #e85b5b;
+
+  /* Typography */
+  --font-ui: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Spacing */
+  --header-height: 44px;
+  --toolbar-height: 40px;
+  --status-height: 24px;
+  --sidebar-width: 560px;
+  --sidebar-min-width: 320px;
+  --sidebar-max-width: 60vw;
+}
+
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header Styles */
+.header {
+  height: var(--header-height);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+.project-name {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-avatars {
+  display: flex;
+  gap: 4px;
+  margin-right: 16px;
+}
+
+.team-avatars img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.action-button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-button:hover {
+  background-color: var(--border-primary);
+}
+
+/* Toolbar Styles */
+.toolbar {
+  height: var(--toolbar-height);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.view-switcher {
+  display: flex;
+  gap: 4px;
+}
+
+.view-button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.view-button.active {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.view-button:hover:not(.active) {
+  background-color: var(--border-primary);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  width: 150px;
+}
+
+.control-button, .zoom-button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.control-button:hover, .zoom-button:hover {
+  background-color: var(--border-primary);
+}
+
+.zoom-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.zoom-button.active {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle input[type="checkbox"] {
+  accent-color: var(--accent-blue);
+}
+
+/* Main Area: Sidebar + Canvas */
+.main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-min-width);
+  max-width: var(--sidebar-max-width);
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.sidebar-header h2 {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.add-task-button {
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.add-task-button:hover {
+  background-color: #4a89dc;
+}
+
+.task-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Resizer */
+.resizer {
+  width: 8px;
+  background-color: var(--border-primary);
+  cursor: col-resize;
+  position: relative;
+}
+
+.resizer:hover {
+  background-color: var(--accent-blue);
+}
+
+/* Canvas Styles */
+.canvas {
+  flex: 1;
+  background-color: var(--bg-tertiary);
+  overflow: auto;
+}
+
+/* Status Bar Styles */
+.status-bar {
+  height: var(--status-height);
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Drawer Styles */
+.drawer, .worklog-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 100;
+}
+
+.drawer.open, .worklog-panel.open {
+  transform: translateX(0);
+}
+
+.drawer-header, .worklog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.drawer-header h2, .worklog-header h2 {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.close-drawer, .close-worklog {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.drawer-content, .worklog-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Task Tree Row Styles */
+.task-row {
+  display: grid;
+  grid-template-columns: 26px 26px 1fr 100px 100px 100px;
+  align-items: center;
+  padding: 4px 8px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.task-row:hover {
+  background-color: var(--border-primary);
+}
+
+.task-row.selected {
+  background-color: var(--bg-tertiary);
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-secondary);
+}

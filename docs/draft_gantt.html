@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gantt Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #161922;
+    --bg3:       #1d2130;
+    --border:    #2a2f42;
+    --border2:   #373d54;
+    --text:      #d4d8e8;
+    --text-muted:#6b7494;
+    --text-dim:  #3e4560;
+    --amber:     #e8a23a;
+    --amber-dim: #7a5219;
+    --amber-bg:  #1e1608;
+    --green:     #3dba74;
+    --green-dim: #1c4c33;
+    --blue:      #5b9cf6;
+    --blue-dim:  #1a2d52;
+    --red:       #e85b5b;
+    --red-dim:   #4c1e1e;
+    --purple:    #9f7ef5;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --row-h:     32px;
+    --header-h:  44px;
+    --toolbar-h: 40px;
+    --sidebar-w: 560px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ── APP SHELL ─────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-rows: var(--header-h) var(--toolbar-h) 1fr;
+    height: 100vh;
+  }
+
+  /* ── HEADER ────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 0 16px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 20px;
+  }
+
+  .logo-mark {
+    width: 22px;
+    height: 22px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .logo-mark svg { display: block; }
+
+  .logo-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.08em;
+  }
+
+  .logo-name span { color: var(--amber); }
+
+  .divider-v {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    margin: 0 14px;
+    flex-shrink: 0;
+  }
+
+  .project-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .project-badge {
+    margin-left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  header .spacer { flex: 1; }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text);
+    transition: border-color .15s, background .15s;
+  }
+
+  .btn:hover { border-color: var(--border2); background: #242840; }
+
+  .btn.primary {
+    background: var(--amber-bg);
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .btn.primary:hover { background: #241c09; border-color: var(--amber); }
+
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .avatar-row {
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+  }
+
+  .avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: -6px;
+    flex-shrink: 0;
+  }
+
+  .avatar:first-child { margin-left: 0; }
+  .av1 { background: #1a2d52; color: var(--blue); }
+  .av2 { background: #1c4c33; color: var(--green); }
+  .av3 { background: var(--amber-bg); color: var(--amber); }
+  .av4 { background: #1e1a35; color: var(--purple); }
+
+  /* ── TOOLBAR ───────────────────────────────────────── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .tool-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .tool-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 8px;
+  }
+
+  .tbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+    white-space: nowrap;
+  }
+
+  .tbtn:hover { background: var(--bg3); color: var(--text); }
+  .tbtn.active { background: var(--bg3); color: var(--amber); }
+
+  .tbtn svg { flex-shrink: 0; }
+
+  .zoom-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 38px;
+    text-align: center;
+  }
+
+  .toolbar .spacer { flex: 1; }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg2);
+  }
+
+  .search-box input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text);
+    width: 140px;
+  }
+
+  .search-box input::placeholder { color: var(--text-dim); }
+
+  /* ── MAIN PANE ─────────────────────────────────────── */
+  .main {
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── SIDEBAR / TASK LIST ───────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: 320px;
+    max-width: 60vw;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+    resize: horizontal;
+  }
+
+  /* column header */
+  .col-header {
+    display: grid;
+    grid-template-columns: 26px 26px 1fr 68px 74px 88px;
+    align-items: center;
+    height: 30px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+
+  .col-header .ch {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ch.right { text-align: right; }
+
+  /* rows */
+  .task-list {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .task-list::-webkit-scrollbar { width: 6px; }
+  .task-list::-webkit-scrollbar-track { background: transparent; }
+  .task-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 26px 26px 1fr 68px 74px 88px;
+    align-items: center;
+    height: var(--row-h);
+    border-bottom: 1px solid var(--border);
+    padding: 0 4px;
+    cursor: pointer;
+    transition: background .1s;
+    position: relative;
+  }
+
+  .row:hover { background: var(--bg3); }
+  .row.selected { background: var(--blue-dim); }
+  .row.group-row { background: var(--bg2); }
+  .row.group-row:hover { background: #1e2235; }
+
+  .cell {
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  /* expand toggle */
+  .cell-toggle {
+    justify-content: center;
+  }
+
+  .toggle-btn {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  /* type badge */
+  .cell-type { justify-content: center; }
+
+  .type-badge {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .type-G { background: #1a2d52; color: var(--blue);   border: 1px solid #24407a; }
+  .type-P { background: #1e1a35; color: var(--purple); border: 1px solid #362e5e; }
+  .type-T { background: var(--bg3); color: var(--text-muted); border: 1px solid var(--border2); }
+  .type-M { background: #1c4c33; color: var(--green); border: 1px solid #235e3e; }
+
+  /* title cell */
+  .cell-title {
+    gap: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .title-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+    padding-left: 2px;
+  }
+
+  .title-text.indent1 { padding-left: 14px; }
+  .title-text.indent2 { padding-left: 26px; }
+
+  .row.group-row .title-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* percent cell */
+  .cell-pct {
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .pct-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1;
+  }
+
+  .pct-bar {
+    width: 48px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .pct-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--amber);
+  }
+
+  .pct-fill.done { background: var(--green); }
+  .pct-fill.low  { background: var(--red); }
+
+  /* hours cell */
+  .cell-hours {
+    justify-content: flex-end;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .hrs-num { color: var(--text); font-size: 12px; }
+  .hrs-unit { color: var(--text-dim); font-size: 10px; margin-left: 1px; }
+
+  /* people cell */
+  .cell-people {
+    gap: 3px;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+
+  .pip {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .more-pip {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    flex-shrink: 0;
+  }
+
+  /* ── RESIZE HANDLE ─────────────────────────────────── */
+  .resize-handle {
+    width: 4px;
+    background: transparent;
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    transition: background .15s;
+  }
+
+  .resize-handle:hover { background: var(--amber-dim); }
+
+  /* ── CANVAS AREA ───────────────────────────────────── */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    background: var(--bg);
+  }
+
+  .canvas-inner {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  .canvas-inner::-webkit-scrollbar { width: 8px; height: 8px; }
+  .canvas-inner::-webkit-scrollbar-track { background: transparent; }
+  .canvas-inner::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .canvas-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .canvas-empty-icon {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .canvas-empty p {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+
+  .canvas-empty span {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ── STATUS BAR ────────────────────────────────────── */
+  .statusbar {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 12px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    gap: 16px;
+  }
+
+  .statusbar .sb-item { display: flex; align-items: center; gap: 5px; }
+  .statusbar .sb-val { color: var(--text); }
+  .statusbar .spacer { flex: 1; }
+
+  /* ── MISC ──────────────────────────────────────────── */
+  .row-num {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    width: 100%;
+  }
+
+  /* ── EDIT DRAWER ───────────────────────────────────── */
+  .drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 11, 16, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+    z-index: 80;
+  }
+
+  .drawer-scrim.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .edit-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 300px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border2);
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform .24s cubic-bezier(.4,0,.2,1);
+    z-index: 90;
+    box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+  }
+
+  .edit-drawer.open { transform: translateY(0); }
+
+  /* drag pill */
+  .drawer-pill {
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border2);
+    margin: 8px auto 0;
+    flex-shrink: 0;
+    cursor: ns-resize;
+  }
+
+  /* drawer header */
+  .drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px 0;
+    flex-shrink: 0;
+  }
+
+  .drawer-type-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .drawer-title-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 0;
+  }
+
+  .drawer-title-input::placeholder { color: var(--text-dim); }
+
+  .drawer-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .dicon-btn {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+
+  .dicon-btn:hover { background: var(--bg3); color: var(--text); }
+  .dicon-btn.danger:hover { background: var(--red-dim); color: var(--red); }
+
+  /* field row */
+  .drawer-body {
+    display: flex;
+    gap: 0;
+    padding: 10px 16px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .drawer-body::-webkit-scrollbar { height: 4px; }
+  .drawer-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .field-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .field-sep {
+    width: 1px;
+    background: var(--border);
+    margin: 0 16px;
+    flex-shrink: 0;
+    align-self: stretch;
+  }
+
+  .field-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .field-value {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* inputs */
+  .d-input {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 5px 8px;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+
+  .d-input:focus { border-color: var(--amber-dim); }
+  .d-input::placeholder { color: var(--text-dim); }
+
+  select.d-input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7494' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
+    cursor: pointer;
+  }
+
+  select.d-input option { background: var(--bg2); }
+
+  /* percent slider field */
+  .pct-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pct-field input[type=range] {
+    flex: 1;
+    accent-color: var(--amber);
+    height: 3px;
+    cursor: pointer;
+  }
+
+  .pct-display {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--amber);
+    min-width: 34px;
+    text-align: right;
+  }
+
+  /* people assignee chips */
+  .people-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 8px 0 5px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .12s;
+  }
+
+  .chip:hover { border-color: var(--border2); }
+
+  .chip-pip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .chip-x {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    margin-left: 2px;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .chip-add {
+    border-style: dashed;
+    color: var(--text-muted);
+  }
+
+  .chip-add:hover { color: var(--text); border-color: var(--border2); }
+
+  /* notes textarea */
+  .d-textarea {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 6px 8px;
+    outline: none;
+    resize: none;
+    transition: border-color .15s;
+    line-height: 1.5;
+  }
+
+  .d-textarea:focus { border-color: var(--amber-dim); }
+  .d-textarea::placeholder { color: var(--text-dim); }
+
+  /* footer bar */
+  .drawer-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px 12px;
+    flex-shrink: 0;
+  }
+
+  .drawer-footer .spacer { flex: 1; }
+
+  .dbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text);
+    transition: border-color .15s, background .15s;
+  }
+
+  .dbtn:hover { background: #242840; }
+
+  .dbtn.save {
+    background: var(--amber-bg);
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .dbtn.save:hover { background: #241c09; border-color: var(--amber); }
+
+  .dbtn.del {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+  }
+
+  .dbtn.del:hover { color: var(--red); border-color: var(--red-dim); background: var(--red-dim); }
+
+  /* active row highlight pulse */
+  .row.editing {
+    background: #1b2038 !important;
+    outline: 1px solid var(--amber-dim);
+    outline-offset: -1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="2" y="6" width="10" height="3" rx="1" fill="#e8a23a"/>
+          <rect x="2" y="11" width="16" height="3" rx="1" fill="#5b9cf6"/>
+          <rect x="2" y="16" width="7" height="3" rx="1" fill="#3dba74"/>
+          <rect x="1" y="1" width="2" height="20" rx="1" fill="#2a2f42"/>
+        </svg>
+      </div>
+      <span class="logo-name">GANTT<span>.</span>IO</span>
+    </div>
+
+    <div class="divider-v"></div>
+    <span class="project-name">Product Launch Q3 2025</span>
+    <span class="project-badge">ACTIVE</span>
+
+    <div class="spacer"></div>
+
+    <div class="header-actions">
+      <div class="avatar-row">
+        <div class="avatar av1">AL</div>
+        <div class="avatar av2">MR</div>
+        <div class="avatar av3">JK</div>
+        <div class="avatar av4">SP</div>
+      </div>
+
+      <div class="divider-v"></div>
+
+      <button class="btn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Add task
+      </button>
+
+      <button class="btn primary">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M10 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M6 4v2l1.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Share
+      </button>
+
+      <button class="btn btn-icon">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="11" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="3" cy="7" r="1.2" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── TOOLBAR ── -->
+  <div class="toolbar">
+    <div class="tool-group">
+      <button class="tbtn active">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="1" width="5" height="11" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="8" y="1" width="4" height="11" rx="1" stroke="currentColor" stroke-width="1.1"/>
+        </svg>
+        Gantt
+      </button>
+      <button class="tbtn">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="1" width="11" height="3" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="1" y="5" width="11" height="3" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="1" y="9" width="11" height="3" rx="1" stroke="currentColor" stroke-width="1.1"/>
+        </svg>
+        List
+      </button>
+      <button class="tbtn">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="7" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="1" y="7" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <rect x="7" y="7" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+        </svg>
+        Board
+      </button>
+    </div>
+
+    <div class="tool-sep"></div>
+
+    <div class="tool-group">
+      <button class="tbtn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M1 3h10M1 6h7M1 9h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Filter
+      </button>
+      <button class="tbtn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 4l4-3 4 3M2 8l4 3 4-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Sort
+      </button>
+      <button class="tbtn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M6 1v10M1 4h10M1 8h10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+        </svg>
+        Group
+      </button>
+    </div>
+
+    <div class="tool-sep"></div>
+
+    <div class="tool-group">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);padding:0 4px;">View</span>
+      <button class="tbtn">Day</button>
+      <button class="tbtn active">Week</button>
+      <button class="tbtn">Month</button>
+      <button class="tbtn">Quarter</button>
+    </div>
+
+    <div class="tool-sep"></div>
+
+    <div class="tool-group">
+      <button class="tbtn btn-icon" title="Zoom out">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M2 5.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <span class="zoom-label">100%</span>
+      <button class="tbtn btn-icon" title="Zoom in">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M5.5 2v7M2 5.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="search-box">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <circle cx="5" cy="5" r="3.5" stroke="#6b7494" stroke-width="1.2"/>
+        <path d="M8 8l2.5 2.5" stroke="#6b7494" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <input type="text" placeholder="Search tasks…" />
+    </div>
+
+    <div class="tool-sep"></div>
+
+    <button class="tbtn">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M1 1h10v2L7 7v4l-2-1V7L1 3V1z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
+      </svg>
+      Baseline
+    </button>
+
+    <button class="tbtn">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 8V4l4-3 4 3v4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5 12V8h2v4" stroke="currentColor" stroke-width="1.1"/>
+      </svg>
+      Critical path
+    </button>
+  </div>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- Column headers -->
+      <div class="col-header">
+        <div class="ch"></div>
+        <div class="ch" title="Type">T</div>
+        <div class="ch">Title</div>
+        <div class="ch right" title="Percent complete">% Done</div>
+        <div class="ch right" title="Expected hours total">Exp. hrs</div>
+        <div class="ch">People</div>
+      </div>
+
+      <!-- Task rows -->
+      <div class="task-list">
+
+        <!-- GROUP: Discovery -->
+        <div class="row group-row">
+          <div class="cell cell-toggle">
+            <div class="toggle-btn">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M2 2l4 2-4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="cell cell-type"><div class="type-badge type-G">G</div></div>
+          <div class="cell cell-title"><span class="title-text">Discovery &amp; Research</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">78%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:78%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">120</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av2" style="font-size:8px;">MR</div>
+            <div class="pip av1" style="font-size:8px;">AL</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">User interviews</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">100%</span>
+            <div class="pct-bar"><div class="pct-fill done" style="width:100%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">40</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av2" style="font-size:8px;">MR</div>
+          </div>
+        </div>
+
+        <div class="row selected">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Competitive analysis</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">65%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:65%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">32</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av4" style="font-size:8px;">SP</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Define personas</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">80%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:80%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">24</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av2" style="font-size:8px;">MR</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-M">M</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Research report sign-off</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">8</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av3" style="font-size:8px;">JK</div>
+          </div>
+        </div>
+
+        <!-- GROUP: Design -->
+        <div class="row group-row">
+          <div class="cell cell-toggle">
+            <div class="toggle-btn">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M2 2l4 2-4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="cell cell-type"><div class="type-badge type-G">G</div></div>
+          <div class="cell cell-title"><span class="title-text">Design &amp; Prototyping</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">40%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:40%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">200</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av3" style="font-size:8px;">JK</div>
+            <div class="pip av4" style="font-size:8px;">SP</div>
+            <div class="more-pip">+1</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Wireframes — core flows</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">90%</span>
+            <div class="pct-bar"><div class="pct-fill done" style="width:90%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">56</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av3" style="font-size:8px;">JK</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Visual design system</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">55%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:55%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">80</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av3" style="font-size:8px;">JK</div>
+            <div class="pip av4" style="font-size:8px;">SP</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-P">P</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Interactive prototype v1</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">20%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:20%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">64</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av4" style="font-size:8px;">SP</div>
+            <div class="pip av1" style="font-size:8px;">AL</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Accessibility audit</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">16</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av2" style="font-size:8px;">MR</div>
+          </div>
+        </div>
+
+        <!-- GROUP: Engineering -->
+        <div class="row group-row">
+          <div class="cell cell-toggle">
+            <div class="toggle-btn">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M2 2l4 2-4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="cell cell-type"><div class="type-badge type-G">G</div></div>
+          <div class="cell cell-title"><span class="title-text">Engineering</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">15%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:15%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">640</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av2" style="font-size:8px;">MR</div>
+            <div class="more-pip">+2</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">API architecture</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">60%</span>
+            <div class="pct-bar"><div class="pct-fill" style="width:60%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">48</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Auth &amp; onboarding</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">30%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:30%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">120</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av2" style="font-size:8px;">MR</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Core feature build</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">5%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:5%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">320</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av2" style="font-size:8px;">MR</div>
+            <div class="more-pip">+2</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">QA &amp; testing</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">96</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av4" style="font-size:8px;">SP</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-M">M</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Beta release</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">8</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av3" style="font-size:8px;">JK</div>
+          </div>
+        </div>
+
+        <!-- GROUP: Launch -->
+        <div class="row group-row">
+          <div class="cell cell-toggle">
+            <div class="toggle-btn">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M2 2l4 2-4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="cell cell-type"><div class="type-badge type-G">G</div></div>
+          <div class="cell cell-title"><span class="title-text">Launch &amp; GTM</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">5%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:5%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">160</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av3" style="font-size:8px;">JK</div>
+            <div class="pip av4" style="font-size:8px;">SP</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Marketing site</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">10%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:10%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">64</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av3" style="font-size:8px;">JK</div>
+            <div class="pip av4" style="font-size:8px;">SP</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-T">T</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Docs &amp; help centre</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">48</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av2" style="font-size:8px;">MR</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"><div class="type-badge type-M">M</div></div>
+          <div class="cell cell-title"><span class="title-text indent1">Public launch</span></div>
+          <div class="cell cell-pct">
+            <span class="pct-val">0%</span>
+            <div class="pct-bar"><div class="pct-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="cell cell-hours"><span class="hrs-num">16</span><span class="hrs-unit">h</span></div>
+          <div class="cell cell-people">
+            <div class="pip av1" style="font-size:8px;">AL</div>
+            <div class="pip av3" style="font-size:8px;">JK</div>
+          </div>
+        </div>
+
+        <!-- add row -->
+        <div class="row" style="opacity:.5;">
+          <div class="cell cell-toggle"></div>
+          <div class="cell cell-type"></div>
+          <div class="cell cell-title">
+            <span style="font-size:11px;color:var(--text-dim);padding-left:4px;display:flex;align-items:center;gap:4px;">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              Add task…
+            </span>
+          </div>
+          <div class="cell cell-pct"></div>
+          <div class="cell cell-hours"></div>
+          <div class="cell cell-people"></div>
+        </div>
+
+      </div>
+      <!-- end task-list -->
+
+      <!-- STATUS BAR -->
+      <div class="statusbar">
+        <div class="sb-item">Tasks <span class="sb-val" style="margin-left:4px;">17</span></div>
+        <div class="sb-item">Groups <span class="sb-val" style="margin-left:4px;">4</span></div>
+        <div class="sb-item">Total hours <span class="sb-val" style="margin-left:4px;">1,120h</span></div>
+        <div class="spacer"></div>
+        <div class="sb-item">Overall <span class="sb-val" style="margin-left:4px;color:var(--amber);">32%</span></div>
+      </div>
+    </div>
+
+    <!-- RESIZE HANDLE -->
+    <div class="resize-handle"></div>
+
+    <!-- CANVAS AREA -->
+    <div class="canvas-area">
+      <div class="canvas-inner">
+        <div class="canvas-empty">
+          <div class="canvas-empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="8" width="10" height="3" rx="1" fill="currentColor" opacity=".4"/>
+              <rect x="3" y="13" width="16" height="3" rx="1" fill="currentColor" opacity=".25"/>
+              <rect x="3" y="18" width="7" height="3" rx="1" fill="currentColor" opacity=".15"/>
+              <line x1="3" y1="5" x2="3" y2="22" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".4"/>
+            </svg>
+          </div>
+          <p>Timeline canvas</p>
+          <span>Gantt bars will render here</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- end main -->
+
+</div>
+<!-- end app -->
+
+<!-- ── DRAWER SCRIM ── -->
+<div class="drawer-scrim" id="scrim"></div>
+
+<!-- ── EDIT DRAWER ── -->
+<div class="edit-drawer" id="editDrawer">
+
+  <div class="drawer-pill" id="drawerPill"></div>
+
+  <!-- Drawer header: type badge + inline title input + actions -->
+  <div class="drawer-head">
+    <div class="drawer-type-badge type-T" id="dTypeBadge">T</div>
+    <input class="drawer-title-input" id="dTitle" type="text" placeholder="Task title…" />
+    <div class="drawer-head-actions">
+      <button class="dicon-btn" title="Duplicate" onclick="closeDrawer()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.1"/>
+          <path d="M1 9V2a1 1 0 0 1 1-1h7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="dicon-btn danger" title="Delete task">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M2 3.5h9M5 3.5V2h3v1.5M5.5 6v4M7.5 6v4M3 3.5l.6 7a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="dicon-btn" title="Close" onclick="closeDrawer()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Drawer body: field columns -->
+  <div class="drawer-body">
+
+    <!-- Col 1: Type + Group -->
+    <div class="field-col" style="width:120px;">
+      <span class="field-label">Type</span>
+      <select class="d-input" id="dType" onchange="syncTypeBadge()">
+        <option value="T">Task</option>
+        <option value="G">Group</option>
+        <option value="P">Prototype</option>
+        <option value="M">Milestone</option>
+      </select>
+
+      <span class="field-label" style="margin-top:6px;">Group</span>
+      <select class="d-input" id="dGroup">
+        <option>Discovery &amp; Research</option>
+        <option>Design &amp; Prototyping</option>
+        <option>Engineering</option>
+        <option>Launch &amp; GTM</option>
+        <option>— None —</option>
+      </select>
+    </div>
+
+    <div class="field-sep"></div>
+
+    <!-- Col 2: Dates -->
+    <div class="field-col" style="width:148px;">
+      <span class="field-label">Start date</span>
+      <input class="d-input" id="dStart" type="date" />
+
+      <span class="field-label" style="margin-top:6px;">End date</span>
+      <input class="d-input" id="dEnd" type="date" />
+    </div>
+
+    <div class="field-sep"></div>
+
+    <!-- Col 3: Progress + Hours -->
+    <div class="field-col" style="width:180px;">
+      <span class="field-label">% Complete</span>
+      <div class="pct-field">
+        <input type="range" min="0" max="100" step="1" id="dPct" oninput="document.getElementById('dPctVal').textContent=this.value+'%'" />
+        <span class="pct-display" id="dPctVal">0%</span>
+      </div>
+
+      <span class="field-label" style="margin-top:6px;">Expected hours</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="d-input" id="dHours" type="number" min="0" step="4" placeholder="0" style="width:72px;" />
+        <span style="font-size:11px;color:var(--text-muted);">hrs total</span>
+      </div>
+
+      <span class="field-label" style="margin-top:6px;">Priority</span>
+      <select class="d-input" id="dPriority">
+        <option>Normal</option>
+        <option>High</option>
+        <option>Critical</option>
+        <option>Low</option>
+      </select>
+    </div>
+
+    <div class="field-sep"></div>
+
+    <!-- Col 4: People -->
+    <div class="field-col" style="width:200px;">
+      <span class="field-label">Assigned people</span>
+      <div class="people-chips" id="dPeopleChips">
+        <div class="chip">
+          <div class="chip-pip av2" style="font-size:7px;">MR</div>
+          Maya R.
+          <span class="chip-x">×</span>
+        </div>
+        <div class="chip">
+          <div class="chip-pip av1" style="font-size:7px;">AL</div>
+          Alex L.
+          <span class="chip-x">×</span>
+        </div>
+        <div class="chip chip-add">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          Add person
+        </div>
+      </div>
+    </div>
+
+    <div class="field-sep"></div>
+
+    <!-- Col 5: Notes -->
+    <div class="field-col" style="width:220px;">
+      <span class="field-label">Notes</span>
+      <textarea class="d-textarea" id="dNotes" rows="5" placeholder="Add context, links, or acceptance criteria…" style="width:100%;"></textarea>
+    </div>
+
+  </div>
+
+  <!-- Drawer footer -->
+  <div class="drawer-footer">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);" id="dMeta">—</span>
+    <div class="spacer"></div>
+    <button class="dbtn del">Delete</button>
+    <button class="dbtn" onclick="closeDrawer()">Discard</button>
+    <button class="dbtn save">Save changes</button>
+  </div>
+
+</div>
+
+<script>
+  const drawer  = document.getElementById('editDrawer');
+  const scrim   = document.getElementById('scrim');
+  let activeRow = null;
+
+  const typeMap = {
+    T: { label:'T', cls:'type-T' },
+    G: { label:'G', cls:'type-G' },
+    P: { label:'P', cls:'type-P' },
+    M: { label:'M', cls:'type-M' },
+  };
+
+  function openDrawer(row) {
+    if (activeRow) activeRow.classList.remove('editing');
+    activeRow = row;
+    row.classList.add('editing');
+
+    const titleEl  = row.querySelector('.title-text');
+    const pctEl    = row.querySelector('.pct-val');
+    const hrsEl    = row.querySelector('.hrs-num');
+    const badgeEl  = row.querySelector('.type-badge');
+    const isGroup  = row.classList.contains('group-row');
+
+    const title    = titleEl  ? titleEl.textContent.trim()  : '';
+    const pct      = pctEl    ? parseInt(pctEl.textContent)  : 0;
+    const hrs      = hrsEl    ? parseInt(hrsEl.textContent)  : 0;
+    const typeChar = badgeEl  ? badgeEl.textContent.trim()  : 'T';
+
+    document.getElementById('dTitle').value    = title;
+    document.getElementById('dPct').value      = pct;
+    document.getElementById('dPctVal').textContent = pct + '%';
+    document.getElementById('dHours').value    = hrs;
+    document.getElementById('dType').value     = typeChar;
+    document.getElementById('dMeta').textContent = 'Last edited: just now  ·  ID #' + Math.floor(Math.random()*900+100);
+
+    syncTypeBadge();
+
+    drawer.classList.add('open');
+    scrim.classList.add('visible');
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    scrim.classList.remove('visible');
+    if (activeRow) { activeRow.classList.remove('editing'); activeRow = null; }
+  }
+
+  function syncTypeBadge() {
+    const val   = document.getElementById('dType').value;
+    const badge = document.getElementById('dTypeBadge');
+    const info  = typeMap[val] || typeMap['T'];
+    badge.textContent = info.label;
+    badge.className   = 'drawer-type-badge ' + info.cls;
+  }
+
+  document.querySelectorAll('.row:not([style*="opacity"])').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('.cell-toggle')) return;
+      if (drawer.classList.contains('open') && activeRow === row) { closeDrawer(); return; }
+      openDrawer(row);
+    });
+  });
+
+  scrim.addEventListener('click', closeDrawer);
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+</script>
+
+</body>
+</html>
+

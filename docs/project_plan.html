@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head><title>Gantt.IO - Simplified Project Plan</title></head>
+<body>
+
+<h1>Gantt.IO - Simplified Project Plan</h1>
+
+<p>Gantt.IO is a single-page, browser-based project planning tool that stores all data in plain JSON files. Following a file-first philosophy, the project file is the source of truth—readable, editable, and diffable without special tooling. The application runs entirely client-side with no server required, and its architecture allows easy migration to a database backend by swapping only the storage adapter. It provides a Gantt chart with task hierarchy (tasks, groups, milestones), simple finish-to-start and start-to-start dependencies, and integrated work log tracking.</p>
+<p>The design uses a dark theme with three background layers (#0f1117 primary, #161922 secondary, #1d2130 tertiary) separated by borders (#2a2f42, #373d54). Text hierarchy uses #d4d8e8 for primary content, #6b7494 for muted secondary text, and #3e4560 for dim tertiary elements. An accent palette of amber (#e8a23a), green (#3dba74), blue (#5b9cf6), purple (#9f7ef5), coral, slate, and orange—each with dim variants—provides color coding for tasks, while red (#e85b5b) indicates errors or warnings. Typography combines IBM Plex Sans for all UI text and IBM Plex Mono for data, labels, and technical elements, with sizes ranging from 9px (row numbers, captions) to 15px (drawer title).</p>
+
+<p>The page structure is a vertical stack: a 44px header containing the logo, project name, team avatars, and action buttons; a 40px toolbar with view switcher (Gantt/List/Board), filter/sort/group controls, zoom controls, search box, and baseline/critical path toggles; a flexible main area split between a resizable sidebar (default 560px, minimum 320px, maximum 60vw) and the canvas; and a 24px status bar displaying counts and overall progress. The sidebar renders a task tree in 32px-high rows across six columns: 26px toggle, 26px type badge (G/group, T/task, P/prototype, M/milestone), title with indentation for hierarchy, percent complete with mini-bar, expected hours, and people pips. Groups have a darker background (#1e2235 on hover), and selected rows use a blue-dim background (#1a2d52).</p>
+
+<p>Interactive behaviors include: a 4px resize handle between sidebar and canvas; collapsible groups with 8x8px chevron toggles; single-row selection with blue-dim highlight; synchronized vertical scroll between sidebar and canvas; sticky task labels that adhere to the left viewport edge when bars scroll off-screen, truncating with ellipsis if space is insufficient; and a slide-up drawer (300px tall) from the bottom for task editing, featuring a drag pill, type badge, title input, field columns, and action buttons. Buttons are consistently 28px tall with primary (amber background) and secondary (bordered) variants, while form inputs use 26-28px heights with subtle borders and focus states.</p>
+<h2>File Structure (10 files)</h2>
+<ul>
+  <li><code>index.html</code> - HTML structure, no logic</li>
+  <li><code>style.css</code></li>
+  <li><code>app.js</code> - Main orchestrator: global state, file menu, event routing, module coordination</li>
+  <li><code>core.js</code> - Types (JSDoc), validation, palette, defaults</li>
+  <li><code>storage/interface.js</code> - Storage API contract (loadProject, saveProject, loadWorklog, saveWorklog)</li>
+  <li><code>storage/json.js</code> - JSON implementation of storage interface</li>
+  <li><code>engine.js</code> - Business logic: task tree, dependencies (finish-to-start, start-to-start), worklog aggregation, snapshot rebuilding</li>
+  <li><code>ui/canvas.js</code> - Gantt canvas rendering: timeline header, task bars, dependency arrows, hit testing</li>
+  <li><code>ui/sidebar.js</code> - Task list: tree rendering, row selection, scroll sync with canvas</li>
+  <li><code>ui/drawer.js</code> - Edit drawer: form binding, validation, save/cancel/delete</li>
+  <li><code>ui/worklog.js</code> - Work log UI: quick entry, history view, aggregation display</li>
+</ul>
+
+<h2>Types</h2>
+
+<h3>Enums</h3>
+<pre><code>TaskType: "task" | "group" | "milestone"
+DependencyRule: "finish_to_start" | "start_to_start"
+Priority: "critical" | "high" | "normal" | "low"
+ConflictState: "none" | "warning" | "error"  // Kept for future extensibility
+PaletteKey: "green" | "blue" | "teal" | "purple" | "amber" | "coral" | "slate" | "orange"</code></pre>
+
+<h3>Entities</h3>
+<pre><code>Person: {
+  id: string,
+  name: string,
+  initials: string,  // max 2 chars
+  color: PaletteKey,
+  role: string,
+  email?: string
+}
+
+Task: {
+  id: string,
+  type: TaskType,
+  title: string,
+  notes: string,
+  parent_id: string | null,
+  people_ids: string[],
+  color: PaletteKey | null,
+  start_date: string,  // ISO 8601 date
+  estimated_hours: number,
+  end_date: string,  // ISO 8601 date
+  end_date_is_flexible: boolean,
+  end_date_flexibility_range: number,  // days
+  end_date_is_last_of_children: boolean,
+  prio: Priority,
+  hours_spent: number,
+  completion_derived: number,  // 0.0-1.0
+  completion_manual: number | null,  // 0.0-1.0
+  conflict_state: ConflictState
+}
+
+Dependency: {
+  id: string,
+  from_task_id: string,
+  to_task_id: string,
+  rule: DependencyRule
+}
+
+WorkEntry: {
+  id: string,
+  date: string,  // ISO 8601 date
+  hours: number,  // > 0
+  person_id: string,
+  task_id: string,
+  note?: string
+}
+
+ProjectMeta: {
+  id: string,
+  name: string,
+  description: string,
+  created_at: string,  // ISO 8601 datetime
+  updated_at: string,  // ISO 8601 datetime
+  color: PaletteKey,
+  worklog_path?: string
+}
+
+Project: {
+  meta: ProjectMeta,
+  people: Person[],
+  tasks: Task[],
+  dependencies: Dependency[]
+}</code></pre>
+
+<h2>File Concerns</h2>
+
+<h3>app.js</h3>
+<ul>
+  <li>Owns global state object (project, worklog, selectedTask, zoom, scroll, etc.)</li>
+  <li>Handles file menu: new, open, save, save-as</li>
+  <li>Routes events between modules (e.g., task selected → update drawer + canvas)</li>
+  <li>Manages view mode (Gantt only, List not implemented per requirements)</li>
+  <li>Coordinates snapshot rebuild after worklog changes</li>
+  <li>No business logic, no rendering, no direct DOM manipulation</li>
+</ul>
+
+<h3>core.js</h3>
+<ul>
+  <li>Defines all types via JSDoc comments</li>
+  <li>Validator functions: validatePerson, validateTask, validateDependency, validateWorkEntry, validateProject</li>
+  <li>Default factories: defaultPerson, defaultTask, defaultDependency, defaultWorkEntry</li>
+  <li>Palette definition and accessor functions (getColorStop, getColorStops)</li>
+  <li>No dependencies on other modules</li>
+</ul>
+
+<h3>storage/interface.js</h3>
+<ul>
+  <li>Defines abstract storage API:
+    <ul>
+      <li><code>loadProject(file)</code> → Project</li>
+      <li><code>saveProject(project, file)</code></li>
+      <li><code>loadWorklog(file)</code> → WorkEntry[]</li>
+      <li><code>saveWorklog(entries, file)</code></li>
+    </ul>
+  </li>
+  <li>No implementation, only function signatures and JSDoc</li>
+</ul>
+
+<h3>storage/json.js</h3>
+<ul>
+  <li>Implements storage/interface.js using JSON and File System Access API</li>
+  <li>Handles file picker fallbacks</li>
+  <li>Serializes/deserializes Project and WorkEntry[] to/from JSON</li>
+  <li>No business logic, only I/O</li>
+</ul>
+
+<h3>engine.js</h3>
+<ul>
+  <li>Task tree operations: getChildren, getDescendants, getSiblings, getPath, getRootTasks</li>
+  <li>Rollup operations: rollupGroup (computes group hours, dates, completion from children)</li>
+  <li>Dependency resolution:
+    <ul>
+      <li><code>computeEarliestStart(taskId, tasks, dependencies)</code> → Date</li>
+      <li><code>getDependencyShift(task, tasks, dependencies)</code> → number (days)</li>
+      <li>Cycle detection</li>
+    </ul>
+  </li>
+  <li>Worklog aggregation:
+    <ul>
+      <li><code>aggregateByTask(entries)</code> → Map&lt;task_id, {hours_spent, last_entry_date}&gt;</li>
+      <li><code>rebuildSnapshots(project, worklogEntries)</code> → Project (updates hours_spent, completion_derived)</li>
+    </ul>
+  </li>
+  <li>Color resolution: <code>resolveColor(task, tasks, projectMeta)</code> → PaletteKey</li>
+  <li>No rendering, no file I/O</li>
+</ul>
+
+<h3>ui/canvas.js</h3>
+<ul>
+  <li>Renders Gantt chart on HTML Canvas element</li>
+  <li>Timeline header: day/week/month/quarter columns based on zoom level</li>
+  <li>Task bar rendering:
+    <ul>
+      <li>Background track (full planned duration, pastel color)</li>
+      <li>Progress fill (width = completion_active, mid color)</li>
+      <li>100% completion = full color</li>
+      <li>Milestones = orange diamond</li>
+      <li>Groups = bracket line</li>
+    </ul>
+  </li>
+  <li>Dependency arrows (elbow-style, neutral color)</li>
+  <li>Hit testing: <code>hitTest(x, y)</code> → task_id | null</li>
+  <li>Scroll/zoom synchronization with sidebar</li>
+  <li>No business logic, reads pre-computed data from engine</li>
+</ul>
+
+<h3>ui/sidebar.js</h3>
+<ul>
+  <li>Renders task list as a tree with indent levels</li>
+  <li>Column cells: type badge, title, % complete mini-bar, expected hours, people pips</li>
+  <li>Row selection state (single select)</li>
+  <li>Collapse/expand for groups</li>
+  <li>Scroll synchronization with canvas</li>
+  <li>Emits events: onRowSelect, onRowCollapse</li>
+  <li>No edit logic, no business logic</li>
+  <li>Clicking an item will open a drawer. to edit the task</li>
+  <li>it is implemented as a virtualized list. each task is a same height div to make virtualization easier.</li>
+</ul>
+
+<h3>ui/drawer.js</h3>
+<ul>
+  <li>Slide-up bottom panel for editing selected task</li>
+  <li>Form fields: title, type, parent, dates, estimated hours, priority, people, notes, manual completion</li>
+  <li>Dependency editor: add/remove dependencies with rule selector</li>
+  <li>Validation feedback (inline)</li>
+  <li>Actions: save (calls engine), delete (with confirmation), discard</li>
+  <li>No file I/O, no rendering beyond the form</li>
+</ul>
+
+<h3>ui/worklog.js</h3>
+<ul>
+  <li>Quick-entry dialog: date, hours, person, task, note</li>
+  <li>Work history view: table of entries, inline editable, deletable</li>
+  <li>Summary panel: hours per person, hours per task</li>
+  <li>Actions: addEntry (calls engine), deleteEntry</li>
+  <li>No aggregation logic (lives in engine), no file I/O (lives in storage)</li>
+</ul>
+
+<h2>Dependency Graph</h2>
+<pre><code>app.js    → core.js (types)
+          → storage/interface.js (API)
+          → storage/json.js (implementation)
+          → engine.js (business logic)
+          → ui/canvas.js (render)
+          → ui/sidebar.js (render)
+          → ui/drawer.js (edit)
+          → ui/worklog.js (worklog UI)
+
+engine.js → core.js (types)
+storage/json.js → core.js (types)
+ui/*     → core.js (types)
+ui/*     → engine.js (data)</code></pre>
+
+<h2>Implementation Order (Top-Down)</h2>
+<ol>
+  <li><strong>Iteration 1:</strong> Create <code>app.js</code> without imports, inventing functions as needed</li>
+  <li><strong>Iteration 2:</strong> Extract required functionality list from <code>app.js</code>, add import block</li>
+  <li><strong>Iteration 3:</strong> Create stubs with JSDoc in corresponding files (<code>core.js</code>, <code>storage/interface.js</code>, <code>engine.js</code>, <code>ui/*.js</code>)</li>
+  <li><strong>Iteration 4:</strong> Implement each file (adding hidden internal functions as needed)</li>
+  <li><strong>Iteration 5:</strong> Update <code>app.js</code> with actual imports and finalize</li>
+</ol>
+<div class="project-status">
+  <h2>File Functions Overview</h2>
+  <table>
+    <thead>
+    <tr>
+      <th><strong>File Name</strong></th>
+      <th><strong>Functions to Implement</strong></th>
+      <th><strong>Functions Called from <code>app_draft.js</code></strong></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td><code>index.html</code></td>
+      <td>HTML structure, no logic</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code>style.css</code></td>
+      <td>Styling, no logic</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code>app.js</code></td>
+      <td>Global state, file menu, event routing, module coordination</td>
+      <td>
+        <code>init</code>, <code>setupDOM</code>, <code>setupEventListeners</code>,
+        <code>newProject</code>, <code>openProject</code>, <code>saveProjectToStorage</code>,
+        <code>loadProjectFromStorage</code>, <code>refreshAll</code>,
+        <code>showNotification</code>, <code>showError</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>core.js</code></td>
+      <td>Types (JSDoc), validation, palette, defaults</td>
+      <td>
+        <code>validatePerson</code>, <code>validateTask</code>, <code>validateDependency</code>,
+        <code>validateWorkEntry</code>, <code>validateProject</code>, <code>defaultPerson</code>,
+        <code>defaultTask</code>, <code>defaultDependency</code>, <code>defaultWorkEntry</code>,
+        <code>getColorStop</code>, <code>getColorStops</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>storage/interface.js</code></td>
+      <td>Storage API contract (<code>loadProject</code>, <code>saveProject</code>, <code>loadWorklog</code>, <code>saveWorklog</code>)</td>
+      <td>
+        <code>loadProjectFromStorage</code>, <code>saveProjectToStorage</code>,
+        <code>loadWorklogFromStorage</code>, <code>saveWorklogToStorage</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>storage/json.js</code></td>
+      <td>JSON implementation of storage interface</td>
+      <td>
+        <code>loadProjectFromStorage</code>, <code>saveProjectToStorage</code>,
+        <code>loadWorklogFromStorage</code>, <code>saveWorklogToStorage</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>engine.js</code></td>
+      <td>Business logic: task tree, dependencies, worklog aggregation, snapshot rebuilding</td>
+      <td>
+        <code>rebuildProjectSnapshots</code>, <code>getTaskIdsToDelete</code>,
+        <code>getDependencyShift</code>, <code>wouldCreateCycle</code>, <code>getDescendants</code>,
+        <code>getChildren</code>, <code>aggregateWorklogByTask</code>, <code>taskWorklog</code>,
+        <code>worklogAggregation</code>, <code>taskAggregation</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>ui/canvas.js</code></td>
+      <td>Gantt canvas rendering: timeline header, task bars, dependency arrows, hit testing</td>
+      <td>
+        <code>refreshCanvas</code>, <code>scrollCanvasToTask</code>,
+        <code>syncScrollBetweenSidebarAndCanvas</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>ui/sidebar.js</code></td>
+      <td>Task list: tree rendering, row selection, scroll sync with canvas</td>
+      <td>
+        <code>refreshSidebar</code>, <code>onTaskSelected</code>, <code>onGroupToggled</code>,
+        <code>onScrollChanged</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>ui/drawer.js</code></td>
+      <td>Edit drawer: form binding, validation, save/cancel/delete</td>
+      <td>
+        <code>refreshDrawer</code>, <code>updateDrawerForTask</code>,
+        <code>onTaskUpdated</code>, <code>onTaskDeleted</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>ui/worklog.js</code></td>
+      <td>Work log UI: quick entry, history view, aggregation display</td>
+      <td>
+        <code>refreshWorklogUI</code>, <code>onWorklogEntryAdded</code>,
+        <code>onWorklogEntryDeleted</code>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+
+  <h2>Current Status</h2>
+  <p>
+    The project is in the early stages of modularization. The <code>core.js</code> file has been drafted with JSDoc stubs for validation, defaults, and palette functions.
+    The next step is to implement the logic for these stubs in <code>core.js</code> and then proceed to extract and move the relevant functions from <code>app_draft.js</code> to their respective files as outlined in the table above.
+  </p>
+
+  <h2>Next Steps</h2>
+  <ol>
+    <li>Implement the logic for the stubbed functions in <code>core.js</code>.</li>
+    <li>Move the functions listed in the third column of the table from <code>app_draft.js</code> to their respective files.</li>
+    <li>Create stubs with JSDoc comments for the next file (e.g., <code>storage/interface.js</code>).</li>
+    <li>Repeat the process for each file in the project structure.</li>
+  </ol>
+</div>
+</body>
+</html>
