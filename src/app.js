@@ -27,7 +27,7 @@ import { loadProject, saveProject, loadWorklog, saveWorklog } from './storage/js
 import { initDrawer, updateDrawerForTask, refreshDrawer as _refreshDrawer } from './ui/drawer.js';
 import { initSidebar, refreshSidebar as _refreshSidebar, syncScroll } from './ui/sidebar.js';
 import { initWorklog, refreshWorklogUI } from './ui/worklog.js';
-import { initCanvas, refreshCanvas as _refreshCanvas, setZoom as _setCanvasZoom } from './ui/canvas.js';
+import { initCanvas, refreshCanvas as _refreshCanvas, setZoom as _setCanvasZoom, syncCanvasScroll } from './ui/canvas.js';
 
 // ============================================================================
 // DEFAULT PROJECT FACTORY
@@ -67,6 +67,7 @@ export const state = {
   // Canvas state
   zoom: 'week',            // 'day' | 'week' | 'month' | 'quarter'
   scroll: { x: 0, y: 0 },
+  collapsedGroups: new Set(),
 
   // UI state
   isDrawerOpen: false,
@@ -80,6 +81,7 @@ export const state = {
   filterText: '',
   sortBy: null,
   groupBy: null
+
 };
 
 // ============================================================================
@@ -91,6 +93,7 @@ export function newProject() {
   state.worklog = [];
   state.selectedTaskId = null;
   state.scroll = { x: 0, y: 0 };
+  state.collapsedGroups = new Set();
 
   refreshAll();
   updateHeader();
@@ -106,9 +109,10 @@ export async function openProject() {
     if (!project) return;
 
     state.project  = project;
-    state.worklog  = await loadWorklog(project.meta.worklog_path ?? fileHandle);
+    state.worklog = project.meta.worklog_path ? await loadWorklog(project.meta.worklog_path) : [];
     state.selectedTaskId = null;
     state.scroll   = { x: 0, y: 0 };
+    state.collapsedGroups = new Set();
     state.project  = rebuildSnapshots(state.project, state.worklog);
 
     refreshAll();
@@ -156,9 +160,18 @@ export async function saveWorklogToFile() {
 // TASK OPERATIONS
 // ============================================================================
 
+// In app.js, modify addTask to accept parent_id:
 export function addTask(taskData = {}) {
   const task = Object.assign(defaultTask(), taskData);
   if (!validateTask(task)) throw new Error('Invalid task data');
+
+  // If parent_id is provided, validate it exists and is a group
+  if (task.parent_id) {
+    const parent = state.project.tasks.find(t => t.id === task.parent_id);
+    if (!parent || parent.type !== 'group') {
+      throw new Error('Parent must be a group task');
+    }
+  }
 
   state.project.tasks.push(task);
   state.project = rebuildSnapshots(state.project, state.worklog);
@@ -413,8 +426,21 @@ function registerWindowEvents() {
   // Sidebar dispatches 'sidebarScroll' so canvas stays in sync
   window.addEventListener('sidebarScroll', e => {
     state.scroll.y = e.detail ?? 0;
-    syncScroll(state.scroll.y);     // keep sidebar in sync if driven externally
+    syncScroll(state.scroll.y);
+    syncCanvasScroll(state.scroll.y);  // <-- Add this line
     _refreshCanvas(state.project, state);
+  });
+
+  // Add this alongside the existing sidebarScroll listener
+  window.addEventListener('canvasScroll', e => {
+    state.scroll.y = e.detail ?? 0;
+    syncScroll(state.scroll.y);  // Sync sidebar to canvas
+  });
+
+  window.addEventListener('groupToggled', e => {
+    // The state is already updated by sidebar, just refresh UI
+    refreshSidebar();
+    refreshCanvas();
   });
 
   // Worklog dispatches 'worklogEntryAdded'
@@ -503,20 +529,26 @@ function wireDOMEvents() {
 // BOOT
 // ============================================================================
 
+// 3. Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
-  const drawerEl   = document.getElementById('drawer-content');
-  const sidebarEl  = document.getElementById('sidebar');
-  const worklogEl  = document.getElementById('worklog-content');
-  const canvasEl   = document.getElementById('canvas');
+  // 4. Get DOM elements
+  const drawerEl = document.getElementById('drawer');
+  const sidebarEl = document.getElementById('sidebar');
+  const worklogEl = document.getElementById('worklog-content');
+  const canvasEl = document.getElementById('canvas');
 
-  // Now UI modules can safely access `state.project`
-  if (drawerEl)  initDrawer(drawerEl);
-  if (sidebarEl) initSidebar(sidebarEl);
-  if (worklogEl) initWorklog(worklogEl); // `state.project` exists!
-  if (canvasEl)  initCanvas(canvasEl);
+  // 5. Initialize modules with state
+  if (drawerEl)  initDrawer(drawerEl, state);
+  if (sidebarEl) initSidebar(sidebarEl, state);
+  if (worklogEl) initWorklog(worklogEl, state);
+  if (canvasEl)  initCanvas(canvasEl, state);
 
-  initResizer();
+  // 6. Wire DOM events (buttons, toggles, etc.)
   wireDOMEvents();
+
+  // 7. Wire cross-module events (e.g., taskUpdated, sidebarScroll)
   registerWindowEvents();
 
+  // 8. Initial render
+  refreshAll();
 });

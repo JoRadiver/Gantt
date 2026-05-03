@@ -8,6 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Drawer Scrim -->
+<div class="drawer-scrim" id="drawer-scrim"></div>
 <!-- Header -->
 <header class="header">
   <div class="header-left">
@@ -63,8 +65,20 @@
       <h2>Tasks</h2>
       <button class="add-task-button" id="add-task-btn">+ Add Task</button>
     </div>
-    <div class="task-tree" id="task-tree">
-      <!-- Task tree will be dynamically rendered here -->
+
+    <!-- Column Headers -->
+    <div class="col-header">
+      <div class="ch"></div>
+      <div class="ch" title="Type">T</div>
+      <div class="ch">Title</div>
+      <div class="ch right" title="Percent complete">% Done</div>
+      <div class="ch right" title="Expected hours">Exp. hrs</div>
+      <div class="ch">People</div>
+    </div>
+
+    <!-- Task List Container -->
+    <div class="task-list" id="task-tree">
+      <!-- Tasks rendered dynamically -->
     </div>
   </aside>
 

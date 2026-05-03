@@ -804,7 +804,7 @@ body {
   transition: transform .24s cubic-bezier(.4,0,.2,1);
   z-index: 90;
   box-shadow: 0 -8px 40px rgba(0,0,0,.5);
-  margin: 0;
+  margin: 0; /* REMOVE any auto margins */
   padding: 0;
 }
 
@@ -850,7 +850,7 @@ body {
   background: transparent;
   border: none;
   outline: none;
-  font-family: var(--font-ui);
+  font-family: var(--sans);
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
@@ -858,7 +858,7 @@ body {
 }
 
 .drawer-title-input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-dim);
 }
 
 .drawer-head-actions {
@@ -889,7 +889,7 @@ body {
 }
 
 .dicon-btn.danger:hover {
-  background: var(--accent-red-dim);
+  background: var(--red-dim);
   color: var(--accent-red);
 }
 
@@ -950,7 +950,7 @@ body {
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   color: var(--text-primary);
-  font-family: var(--font-ui);
+  font-family: var(--sans);
   font-size: 12px;
   padding: 5px 8px;
   outline: none;
@@ -963,7 +963,7 @@ body {
 }
 
 .d-input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-dim);
 }
 
 select.d-input {
@@ -1041,6 +1041,18 @@ select.d-input option {
   flex-shrink: 0;
 }
 
+.chip-x {
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  margin-left: 2px;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .chip-add {
   border-style: dashed;
   color: var(--text-secondary);
@@ -1057,7 +1069,7 @@ select.d-input option {
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   color: var(--text-primary);
-  font-family: var(--font-ui);
+  font-family: var(--sans);
   font-size: 12px;
   padding: 6px 8px;
   outline: none;
@@ -1072,7 +1084,7 @@ select.d-input option {
 }
 
 .d-textarea::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-dim);
 }
 
 /* Drawer footer */
@@ -1095,7 +1107,7 @@ select.d-input option {
   height: 28px;
   padding: 0 12px;
   border-radius: 4px;
-  font-family: var(--font-ui);
+  font-family: var(--sans);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -1116,7 +1128,7 @@ select.d-input option {
 }
 
 .dbtn.save:hover {
-  background: var(--accent-green);
+  background: #1c4c33;
   border-color: var(--accent-green);
 }
 
@@ -1131,26 +1143,3 @@ select.d-input option {
   border-color: var(--accent-red-dim);
   background: var(--accent-red-dim);
 }
-
-/* Type badge colors */
-.drawer-type-badge.type-T {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-secondary);
-}
-.drawer-type-badge.type-G {
-  background: #1a2d52;
-  color: var(--accent-blue);
-  border: 1px solid #24407a;
-}
-.drawer-type-badge.type-P {
-  background: #1e1a35;
-  color: var(--accent-purple);
-  border: 1px solid #362e5e;
-}
-.drawer-type-badge.type-M {
-  background: #1c4c33;
-  color: var(--accent-green);
-  border: 1px solid #235e3e;
-}
-

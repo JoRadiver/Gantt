@@ -19,11 +19,9 @@
 // STATE
 // ============================================================================
 let worklogElement = null;
-let worklogEntries = [];
-let currentProject = null;
-let quickEntryDialog = null;
 let historyTable = null;
 let summaryPanel = null;
+let _state = null;  // Reference to global app state (passed during init)
 
 // ============================================================================
 // DOM HELPERS
@@ -33,11 +31,12 @@ let summaryPanel = null;
  * Creates a quick entry form.
  * @returns {HTMLElement} Quick entry form element.
  */
-function createQuickEntryForm(project) {
-  if (!project) {
+function createQuickEntryForm() {
+  if (!_state?.project) {
     console.error("Project is not provided!");
     return null;
   }
+  const project = _state.project;
   const form = document.createElement('form');
   form.className = 'quick-entry-form';
 
@@ -96,7 +95,7 @@ function createQuickEntryForm(project) {
   taskLabel.textContent = 'Task';
   const taskSelect = document.createElement('select');
   taskSelect.id = 'worklog-task';
-  currentProject.tasks?.forEach(task => {
+  project.tasks?.forEach(task => {
     const option = document.createElement('option');
     option.value = task.id;
     option.textContent = task.title;
@@ -180,6 +179,9 @@ function createHistoryTable() {
  * @param {WorkEntry} entry - The worklog entry to render.
  */
 function renderWorklogEntry(entry) {
+  if (!_state?.project) return;
+
+  const project = _state.project;
   const row = document.createElement('tr');
   row.dataset.entryId = entry.id;
 
@@ -192,12 +194,12 @@ function renderWorklogEntry(entry) {
   row.appendChild(hoursCell);
 
   const personCell = document.createElement('td');
-  const person = currentProject.people?.find(p => p.id === entry.person_id);
+  const person = project.people?.find(p => p.id === entry.person_id);
   personCell.textContent = person?.name || 'Unknown';
   row.appendChild(personCell);
 
   const taskCell = document.createElement('td');
-  const task = currentProject.tasks?.find(t => t.id === entry.task_id);
+  const task = project.tasks?.find(t => t.id === entry.task_id);
   taskCell.textContent = task?.title || 'Unknown';
   row.appendChild(taskCell);
 
@@ -215,7 +217,10 @@ function renderWorklogEntry(entry) {
   actionsCell.appendChild(deleteBtn);
   row.appendChild(actionsCell);
 
-  historyTable.querySelector('tbody').appendChild(row);
+  if (historyTable) {
+    const tbody = historyTable.querySelector('tbody');
+    if (tbody) tbody.appendChild(row);
+  }
 }
 
 /**
@@ -247,42 +252,45 @@ function createSummaryPanel() {
  * Updates the summary panel with aggregated data.
  */
 function updateSummaryPanel() {
+  if (!_state?.project || !_state.worklog || !summaryPanel) return;
+
+  const project = _state.project;
+  const entries = _state.worklog;
+
   const hoursByPerson = {};
   const hoursByTask = {};
 
-  worklogEntries.forEach(entry => {
-    // Aggregate by person
-    if (!hoursByPerson[entry.person_id]) {
-      hoursByPerson[entry.person_id] = 0;
-    }
+  entries.forEach(entry => {
+    if (!hoursByPerson[entry.person_id]) hoursByPerson[entry.person_id] = 0;
     hoursByPerson[entry.person_id] += entry.hours;
 
-    // Aggregate by task
-    if (!hoursByTask[entry.task_id]) {
-      hoursByTask[entry.task_id] = 0;
-    }
+    if (!hoursByTask[entry.task_id]) hoursByTask[entry.task_id] = 0;
     hoursByTask[entry.task_id] += entry.hours;
   });
 
   // Render hours by person
   const personContainer = summaryPanel.querySelector('#hours-by-person');
-  personContainer.innerHTML = '';
-  Object.entries(hoursByPerson).forEach(([personId, hours]) => {
-    const person = currentProject.people?.find(p => p.id === personId);
-    const p = document.createElement('p');
-    p.textContent = `${person?.name || 'Unknown'}: ${hours} hours`;
-    personContainer.appendChild(p);
-  });
+  if (personContainer) {
+    personContainer.innerHTML = '';
+    Object.entries(hoursByPerson).forEach(([personId, hours]) => {
+      const person = project.people?.find(p => p.id === personId);
+      const p = document.createElement('p');
+      p.textContent = `${person?.name || 'Unknown'}: ${hours} hours`;
+      personContainer.appendChild(p);
+    });
+  }
 
   // Render hours by task
   const taskContainer = summaryPanel.querySelector('#hours-by-task');
-  taskContainer.innerHTML = '';
-  Object.entries(hoursByTask).forEach(([taskId, hours]) => {
-    const task = currentProject.tasks?.find(t => t.id === taskId);
-    const p = document.createElement('p');
-    p.textContent = `${task?.title || 'Unknown'}: ${hours} hours`;
-    taskContainer.appendChild(p);
-  });
+  if (taskContainer) {
+    taskContainer.innerHTML = '';
+    Object.entries(hoursByTask).forEach(([taskId, hours]) => {
+      const task = project.tasks?.find(t => t.id === taskId);
+      const p = document.createElement('p');
+      p.textContent = `${task?.title || 'Unknown'}: ${hours} hours`;
+      taskContainer.appendChild(p);
+    });
+  }
 }
 
 // ============================================================================
@@ -292,45 +300,51 @@ function updateSummaryPanel() {
 /**
  * Initializes the worklog UI module.
  * @param {HTMLElement} element - The DOM element for the worklog panel.
+ * @param {Object} state - Global app state.
  */
-function initWorklog(containerEl, project) {
-  if (!project) {
-    console.error("Project is not provided!");
-    return;
-  }
+function initWorklog(element, state) {
+  _state = state;
+  worklogElement = element;
+
   // Clear existing content
-  containerEl.innerHTML = '';
-  const form = createQuickEntryForm(project); // Pass project
-  containerEl.appendChild(form);
+  element.innerHTML = '';
+
+  // Create and append all UI components
+  const form = createQuickEntryForm();
+  historyTable = createHistoryTable();
+  summaryPanel = createSummaryPanel();
+
+  if (form) element.appendChild(form);
+  element.appendChild(historyTable);
+  element.appendChild(summaryPanel);
 }
 
 /**
  * Refreshes the worklog UI with the latest entries and aggregations.
- * @param {WorkEntry[]} entries - The worklog entries to display.
- * @param {Project} project - The project data.
  */
-function refreshWorklogUI(entries, project) {
-  if (!project) {
-    console.warn("Project is not provided!");
-    return;
-  }
-  const container = document.getElementById('worklog-content');
-  if (!container) {
-    console.warn("Worklog container not found!");
-    return;
-  }
-  // Safely query elements
-  const form = container.querySelector('.quick-entry-form');
-  worklogEntries = entries || [];
-  currentProject = project;
+function refreshWorklogUI() {
+  if (!_state?.project || !worklogElement) return;
 
-  // Clear and re-render history
-  const tbody = historyTable.querySelector('tbody');
-  tbody.innerHTML = '';
-  worklogEntries.forEach(entry => renderWorklogEntry(entry));
+  const entries = _state.worklog || [];
 
-  // Update summary
+  // Re-render history table
+  if (historyTable) {
+    const tbody = historyTable.querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
+      entries.forEach(entry => renderWorklogEntry(entry));
+    }
+  }
+
+  // Update summary panel
   updateSummaryPanel();
+
+  // Re-create form to ensure it has latest project data (e.g., new tasks/people)
+  const existingForm = worklogElement.querySelector('.quick-entry-form');
+  if (existingForm) {
+    const newForm = createQuickEntryForm();
+    if (newForm) worklogElement.replaceChild(newForm, existingForm);
+  }
 }
 
 /**
@@ -338,10 +352,8 @@ function refreshWorklogUI(entries, project) {
  * @param {WorkEntry} entry - The new worklog entry.
  */
 function onWorklogEntryAdded(entry) {
-  worklogEntries.push(entry);
-  refreshWorklogUI(worklogEntries, currentProject);
-  // Emit event to notify other modules (e.g., engine, storage)
   window.dispatchEvent(new CustomEvent('worklogEntryAdded', { detail: entry }));
+  refreshWorklogUI(); // Immediate UI update (app.js will sync state via event)
 }
 
 /**
@@ -349,10 +361,8 @@ function onWorklogEntryAdded(entry) {
  * @param {string} entryId - The ID of the entry to delete.
  */
 function onWorklogEntryDeleted(entryId) {
-  worklogEntries = worklogEntries.filter(entry => entry.id !== entryId);
-  refreshWorklogUI(worklogEntries, currentProject);
-  // Emit event to notify other modules (e.g., engine, storage)
   window.dispatchEvent(new CustomEvent('worklogEntryDeleted', { detail: entryId }));
+  refreshWorklogUI();
 }
 
 // ============================================================================

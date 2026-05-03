@@ -39,7 +39,7 @@ let _layout   = null;
 const ROW_H    = 32;   // px — must match sidebar row height
 const BAR_H    = 18;   // px — height of a task bar
 const BAR_R    = 3;    // px — bar corner radius
-const HEADER_H = 48;   // px — two-row sticky header
+const HEADER_H = 81;   // px — two-row sticky header
 const PAD_DAYS = 14;   // days of whitespace before/after project span
 
 /** Pixels per day at each zoom level. */
@@ -117,8 +117,9 @@ function _dateToX(date, rangeStart, dayPx) {
  * Initialise the canvas module.
  * @param {HTMLElement} element - The <main id="canvas"> container.
  */
-export function initCanvas(element) {
+export function initCanvas(element, state) {
   _element = element;
+  _appState = state;  // Store state reference for later use
   _element.classList.add('canvas--ready');
   _setupDOM();
   _renderEmpty('No project loaded. Click "New" or "Open" to get started.');
@@ -321,6 +322,7 @@ function _render() {
   _drawBackground();
   _drawGridLines();
   _drawTodayColumn();
+  _drawCurrentTimeLine();
   _drawBars();
   _drawDependencies();
   _buildHeader();
@@ -468,6 +470,28 @@ function _drawTodayColumn() {
   _ctx.lineTo(x + 0.5, totalH);
   _ctx.stroke();
   _ctx.setLineDash([]);
+  _ctx.globalAlpha = 1;
+}
+
+// ============================================================================
+// DRAWING — CURRENT TIME LINE
+// ============================================================================
+
+function _drawCurrentTimeLine() {
+  const { range, dayPx, totalH } = _layout;
+  const now = new Date();
+  if (+now < +range.start || +now > +range.end) return;
+
+  const x = _dateToX(now, range.start, dayPx);
+
+  // Thin red line at current time
+  _ctx.strokeStyle = '#ff0000';
+  _ctx.lineWidth = 1;
+  _ctx.globalAlpha = 0.8;
+  _ctx.beginPath();
+  _ctx.moveTo(x + 0.5, 0);
+  _ctx.lineTo(x + 0.5, totalH);
+  _ctx.stroke();
   _ctx.globalAlpha = 1;
 }
 
