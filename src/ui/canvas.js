@@ -32,6 +32,21 @@ let _ctx      = null;
 /** Cached layout, recomputed on every render pass. */
 let _layout   = null;
 
+let _taskEdges = {};  // taskId -> {x1, x2, type}
+let _drag = {
+  active: false,
+  taskId: null,
+  edge: null,
+  originalStart: null,
+  originalEnd: null,
+  lastDay: null
+};
+let _tooltip = null;
+let _clickStart = {
+  taskId: null,
+  time: null
+};
+
 // ============================================================================
 // LAYOUT CONSTANTS
 // ============================================================================
@@ -41,6 +56,7 @@ const BAR_H    = 18;   // px — height of a task bar
 const BAR_R    = 3;    // px — bar corner radius
 const HEADER_H = 81;   // px — two-row sticky header
 const PAD_DAYS = 14;   // days of whitespace before/after project span
+const EDGE_TOLERANCE = 5; // px
 
 /** Pixels per day at each zoom level. */
 const DAY_PX = { day: 44, week: 22, month: 8, quarter: 3 };
@@ -107,6 +123,56 @@ function _isoWeek(date) {
 /** Convert a date value to a pixel x-coordinate. */
 function _dateToX(date, rangeStart, dayPx) {
   return ((+new Date(date)) - (+rangeStart)) / 86400000 * dayPx;
+}
+
+/**
+ * Convert a pixel x-coordinate to a Date (snapped to full days).
+ */
+function _xToDate(x) {
+  const { range, dayPx } = _layout;
+  const ms = Math.round(x / dayPx) * 86400000 + (+range.start);
+  return new Date(ms);
+}
+
+/**
+ * Add days to a date.
+ */
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+/**
+ * Get the task at a given y-coordinate (based on row height).
+ */
+function get_task_at_height(y) {
+  const rowIdx = Math.floor(y / ROW_H);
+  if (rowIdx < 0 || rowIdx >= _layout.visible.length) return null;
+  return _layout.visible[rowIdx].task;
+}
+
+/**
+ * Test if cursor is near a draggable edge of a task.
+ * Returns { taskId, edge } or null.
+ */
+function hitTestEdge(x, y) {
+  const task = get_task_at_height(y);
+  if (!task) return null;
+  const edges = _taskEdges[task.id];
+  if (!edges) return null;
+  const { x1, x2, type } = edges;
+
+  if (type === 'group') return null; // Not draggable
+
+  if (type === 'task') {
+    if (Math.abs(x - x1) <= EDGE_TOLERANCE) return { taskId: task.id, edge: 'left' };
+    if (Math.abs(x - x2) <= EDGE_TOLERANCE) return { taskId: task.id, edge: 'right' };
+  }
+  else if (type === 'milestone') {
+    if (Math.abs(x - x1) <= EDGE_TOLERANCE) return { taskId: task.id, edge: 'milestone' };
+  }
+  return null;
 }
 
 // ============================================================================
@@ -212,7 +278,11 @@ function _setupDOM() {
   _ctx = _canvasEl.getContext('2d');
 
   _element.addEventListener('scroll', _onScroll, { passive: true });
-  _canvasEl.addEventListener('click', _onCanvasClick);
+  _canvasEl.addEventListener('mousedown', _onCanvasMouseDown);
+  _canvasEl.addEventListener('mousemove', _onCanvasMouseMove);
+  _canvasEl.addEventListener('mouseup', _onCanvasMouseUp);
+  _canvasEl.addEventListener('mouseleave', _onCanvasMouseUp);
+  _canvasEl.style.cursor = 'default';
 }
 
 // ============================================================================
@@ -221,6 +291,7 @@ function _setupDOM() {
 
 function _renderEmpty(message) {
   if (!_canvasEl) return;
+  _taskEdges = {};
 
   _headerEl.innerHTML = '';
   _headerEl.style.height = '0';
@@ -505,9 +576,22 @@ function _drawBars() {
   const showCritPath = _appState?.showCriticalPath  ?? false;
   const scrollLeft   = _element ? _element.scrollLeft : 0;
 
+  // Clear and repopulate task edges
+  _taskEdges = {};
+
   for (let i = 0; i < visible.length; i++) {
     const { task } = visible[i];
     const rowY = i * ROW_H;
+
+    // Calculate x1/x2 for edge tracking
+    const x1 = _dateToX(task.start_date, range.start, dayPx);
+    let x2;
+    if (task.type === 'milestone') {
+      x2 = x1; // Milestone is a point
+    } else {
+      x2 = _dateToX(task.end_date, range.start, dayPx);
+    }
+    _taskEdges[task.id] = { x1, x2, type: task.type };
 
     if (task.type === 'milestone') {
       _drawMilestone(task, rowY, range, dayPx, selectedId, scrollLeft);
@@ -1027,11 +1111,147 @@ function _onScroll() {
   }));
 }
 
-function _onCanvasClick(e) {
-  if (!_layout) return;
+
+
+function _onCanvasMouseDown(e) {
+  if (_drag.active) return;
   const rect = _canvasEl.getBoundingClientRect();
-  const id = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-  if (id !== null) {
-    window.dispatchEvent(new CustomEvent('taskSelected', { detail: id }));
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const hit = hitTestEdge(x, y);
+
+  if (hit) {
+    // Start drag (existing logic)
+    const task = _project.tasks.find(t => t.id === hit.taskId);
+    if (!task) return;
+
+    _drag = {
+      active: true,
+      taskId: hit.taskId,
+      edge: hit.edge,
+      originalStart: new Date(task.start_date),
+      originalEnd: new Date(task.end_date),
+      lastDay: null
+    };
+    _clickStart = { taskId: null, time: null }; // Clear click tracking for drags
+
+    // Create tooltip (existing)
+    _tooltip = document.createElement('div');
+    _tooltip.className = 'drag-tooltip';
+    Object.assign(_tooltip.style, {
+      position: 'absolute',
+      background: C.bgGroup,
+      color: C.text,
+      padding: '2px 6px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontFamily: '"IBM Plex Sans", sans-serif',
+      pointerEvents: 'none',
+      zIndex: 1000,
+      border: `1px solid ${C.border}`
+    });
+    document.body.appendChild(_tooltip);
+    e.preventDefault();
+    return;
   }
+
+  // Not hitting an edge: record for potential click
+  const taskId = hitTest(x, y);
+  _clickStart = {
+    taskId: taskId,
+    time: Date.now()
+  };
+}
+
+function _onCanvasMouseMove(e) {
+  const rect = _canvasEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (!_drag.active) {
+    // Update cursor on hover
+    const hit = hitTestEdge(x, y);
+    _canvasEl.style.cursor = hit ? (hit.edge === 'milestone' ? 'grab' : 'ew-resize') : 'default';
+    return;
+  }
+
+  const newDay = _xToDate(x);
+
+  // Skip if same day as last update
+  if (_drag.lastDay && +newDay === +_drag.lastDay) return;
+  _drag.lastDay = newDay;
+  // clear clicking listener if moved across a day boundary
+  if (_clickStart.taskId) {
+    _clickStart = { taskId: null, time: null };
+  }
+
+  // Calculate new dates
+  let newStart = _drag.originalStart;
+  let newEnd = _drag.originalEnd;
+
+  if (_drag.edge === 'left') {
+    newStart = newDay;
+    // Clamp start to not go past end
+    if (+newStart > +newEnd) {
+      newStart = addDays(newEnd, -1);
+    }
+  } else if (_drag.edge === 'right') {
+    newEnd = newDay;
+    // Clamp end to not go before start
+    if (+newEnd < +newStart) {
+      newEnd = addDays(newStart, 1);
+    }
+  } else { // milestone
+    newStart = newDay;
+    newEnd = addDays(newStart, 1);
+  }
+
+  // Update task and refresh
+  const task = _project.tasks.find(t => t.id === _drag.taskId);
+  if (task) {
+    task.start_date = newStart.toISOString().split('T')[0];
+    task.end_date = newEnd.toISOString().split('T')[0];
+    window.dispatchEvent(new CustomEvent('taskUpdated', { detail: task }));
+  }
+
+  // Update tooltip
+  const dateStr = _drag.edge === 'right'
+    ? newEnd.toISOString().split('T')[0]
+    : newStart.toISOString().split('T')[0];
+  _tooltip.textContent = dateStr;
+  _tooltip.style.left = `${e.clientX + 10}px`;
+  _tooltip.style.top = `${e.clientY - 25}px`;
+}
+
+function _onCanvasMouseUp(e) {
+  if (_drag.active) {
+    if (_tooltip) _tooltip.remove();
+    _tooltip = null;
+    _drag = { active: false, taskId: null, edge: null, originalStart: null, originalEnd: null, lastDay: null };
+    _canvasEl.style.cursor = 'default';
+    _clickStart = { taskId: null, time: null };
+    return;
+  }
+
+  // Handle click-to-select
+  if (_clickStart.taskId && _clickStart.time) {
+    const clickDuration = Date.now() - _clickStart.time;
+    if (clickDuration < 1000) { // 1-second threshold
+      let taskIdAtMouseup = null;
+      if (e) {
+        const rect = _canvasEl.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        taskIdAtMouseup = hitTest(x, y);
+      } else {
+        taskIdAtMouseup = _clickStart.taskId;
+      }
+
+      if (taskIdAtMouseup === _clickStart.taskId) {
+        window.dispatchEvent(new CustomEvent('taskSelected', { detail: _clickStart.taskId }));
+      }
+    }
+  }
+
+  _clickStart = { taskId: null, time: null };
 }
