@@ -365,6 +365,51 @@ function resolveColor(task, tasks, projectMeta) {
 }
 
 // ============================================================================
+// GROUP DATE ROLLUP
+// ============================================================================
+
+/**
+ * Updates a group's start and end dates to encompass all its descendants.
+ * A group always runs for the duration of its members (children, grandchildren, etc.).
+ * Modifies the group task in place.
+ * @param {Task} group - The group task to update
+ * @param {Task[]} tasks - Array of all tasks
+ */
+function updateGroupDates(group, tasks) {
+  if (group.type !== 'group') return;
+
+  const allDescendants = getDescendants(group.id, tasks);
+  if (allDescendants.length === 0) {
+    // If no descendants, keep existing dates
+    return;
+  }
+
+  let earliestStart = null;
+  let latestEnd = null;
+
+  for (const descendant of allDescendants) {
+    if (descendant.start_date) {
+      const start = new Date(descendant.start_date);
+      if (!earliestStart || start < earliestStart) {
+        earliestStart = start;
+      }
+    }
+    if (descendant.end_date) {
+      const end = new Date(descendant.end_date);
+      if (!latestEnd || end > latestEnd) {
+        latestEnd = end;
+      }
+    }
+  }
+
+  // Only update if we found valid dates
+  if (earliestStart && latestEnd) {
+    group.start_date = earliestStart.toISOString().split('T')[0];
+    group.end_date = latestEnd.toISOString().split('T')[0];
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 // Export all functions for use in other modules
@@ -377,6 +422,7 @@ export {
   getRootTasks,
   // Rollup operations
   rollupGroup,
+  updateGroupDates,
   // Dependency resolution
   computeEarliestStart,
   getDependencyShift,

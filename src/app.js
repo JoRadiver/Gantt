@@ -19,7 +19,7 @@ import {
   getRootTasks, rollupGroup, getChildren,
   computeEarliestStart, getDependencyShift, wouldCreateCycle,
   aggregateByTask, rebuildSnapshots, getDescendants,
-  resolveColor
+  resolveColor, updateGroupDates,
 } from './engine.js';
 
 import { loadProject, saveProject, loadWorklog, saveWorklog } from './storage/json.js';
@@ -95,6 +95,19 @@ export const state = {
 // ============================================================================
 // FILE MENU HANDLERS
 // ============================================================================
+
+/**
+ * Updates all group tasks in the project to encompass their descendants' dates.
+ * Call this whenever tasks are added, updated, deleted, or moved.
+ */
+function updateAllGroupDates() {
+  if (!state.project?.tasks) return;
+  for (const task of state.project.tasks) {
+    if (task.type === 'group') {
+      updateGroupDates(task, state.project.tasks);
+    }
+  }
+}
 
 export function newProject() {
   state.project = createDefaultProject();
@@ -182,6 +195,7 @@ export function addTask(taskData = {}) {
   }
 
   state.project.tasks.push(task);
+  updateAllGroupDates();
   state.project = rebuildSnapshots(state.project, state.worklog);
   refreshAll();
   updateStatusBar();
@@ -195,6 +209,7 @@ export function updateTask(taskId, updates) {
   if (!validateTask(updated)) throw new Error('Invalid task data');
 
   state.project.tasks[idx] = updated;
+  updateAllGroupDates();
   state.project = rebuildSnapshots(state.project, state.worklog);
   refreshAll();
   updateStatusBar();
@@ -211,6 +226,7 @@ export function deleteTask(taskId) {
   );
 
   if (state.selectedTaskId === taskId) state.selectedTaskId = null;
+  updateAllGroupDates();
   state.project = rebuildSnapshots(state.project, state.worklog);
   refreshAll();
   updateStatusBar();
@@ -525,6 +541,7 @@ function registerWindowEvents() {
       return;
     }
     task.parent_id = groupId;
+    updateAllGroupDates();
     state.project = rebuildSnapshots(state.project, state.worklog);
     refreshAll();
   });
@@ -594,6 +611,7 @@ function registerWindowEvents() {
     task1.parent_id = newGroup.id;
     task2.parent_id = newGroup.id;
 
+    updateAllGroupDates();
     state.project = rebuildSnapshots(state.project, state.worklog);
     refreshAll();
   });
@@ -634,6 +652,7 @@ function registerWindowEvents() {
       state.project.tasks.push(task);
     }
 
+    updateAllGroupDates();
     state.project = rebuildSnapshots(state.project, state.worklog);
     refreshAll();
   });
@@ -678,6 +697,7 @@ function registerWindowEvents() {
       state.selectedTaskId = null;
     }
 
+    updateAllGroupDates();
     state.project = rebuildSnapshots(state.project, state.worklog);
     refreshAll();
     updateStatusBar();

@@ -397,6 +397,7 @@ function bindTaskToForm() {
   startInput.dataset.field = 'start_date'; // NEW
   startInput.addEventListener('change', handleFieldChange); // NEW
   startInput.value = currentTask.start_date;
+  if (currentTask.type === 'group') startInput.disabled = true;
   col2.appendChild(startInput);
 
   // End Date
@@ -412,6 +413,7 @@ function bindTaskToForm() {
   endInput.dataset.field = 'end_date'; // NEW
   endInput.addEventListener('change', handleFieldChange); // NEW
   endInput.value = currentTask.end_date;
+  if (currentTask.type === 'group' || currentTask.type === 'milestone') endInput.disabled = true;
   col2.appendChild(endInput);
 
   body.appendChild(col2);
