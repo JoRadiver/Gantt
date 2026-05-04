@@ -14,7 +14,14 @@
 <header class="header">
   <div class="header-left">
     <div class="logo">Gantt.IO</div>
-    <div class="project-name">Untitled Project</div>
+    <div class="project-info">
+      <input type="text" class="project-name-input" id="project-name-input" value="Untitled Project" placeholder="Project name">
+      <span class="edit-placeholder"> </span>
+      <span class="edit-icon">✏️</span>
+      <input type="date" class="project-date-input" id="project-start-date">
+      <span class="date-separator">-</span>
+      <input type="date" class="project-date-input" id="project-end-date">
+    </div>
   </div>
   <div class="header-right">
     <div class="team-avatars">
@@ -29,11 +36,6 @@
 <!-- Toolbar -->
 <div class="toolbar">
   <div class="toolbar-left">
-    <div class="view-switcher">
-      <button class="view-button active" data-view="gantt">Gantt</button>
-      <button class="view-button" data-view="list">List</button>
-      <button class="view-button" data-view="board">Board</button>
-    </div>
     <div class="controls">
       <input type="text" class="search-box" placeholder="Search...">
       <button class="control-button">Filter</button>
@@ -48,12 +50,6 @@
       <button class="zoom-button" data-zoom="month">Month</button>
       <button class="zoom-button" data-zoom="quarter">Quarter</button>
     </div>
-    <label class="toggle">
-      <input type="checkbox" id="baseline-toggle"> Baseline
-    </label>
-    <label class="toggle">
-      <input type="checkbox" id="critical-path-toggle"> Critical Path
-    </label>
   </div>
 </div>
 

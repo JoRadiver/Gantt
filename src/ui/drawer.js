@@ -12,6 +12,9 @@
  * @typedef {import('../core.js').Person} Person
  */
 
+import { PALETTE } from '../core.js';
+import { getDescendants } from '../engine.js';
+
 // ============================================================================
 // STATE
 // ============================================================================
@@ -21,6 +24,7 @@ let currentProject = null;
 let isOpen = false;
 let _state = null;
 let scrimElement = null;
+let sliderTouched = false;
 
 // ============================================================================
 // HELPERS
@@ -37,30 +41,127 @@ function createFieldSep() {
 }
 
 /**
- * Validates the form data.
- * @returns {boolean}
+ * Validates the task for auto-save.
+ * @param {Task} task - The task to validate.
+ * @returns {boolean} - True if valid.
  */
-function validateForm() {
-  const title = document.getElementById('drawer-title-input').value.trim();
-  if (!title) {
+function validateTaskForSave(task) {
+  if (!task) return false;
+  // Title is required
+  if (typeof task.title !== 'string' || task.title.trim() === '') {
     alert('Title is required.');
     return false;
   }
-
-  const startDate = document.getElementById('task-start-date').value;
-  const endDate = document.getElementById('task-end-date').value;
-  if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-    alert('Start date must be before end date.');
-    return false;
+  // Start date must be before end date
+  if (task.start_date && task.end_date) {
+    const start = new Date(task.start_date);
+    const end = new Date(task.end_date);
+    if (start > end) {
+      alert('Start date must be before end date.');
+      return false;
+    }
   }
-
-  const estimatedHours = parseFloat(document.getElementById('task-hours').value);
-  if (isNaN(estimatedHours) || estimatedHours < 0) {
+  // Estimated hours must be non-negative
+  if (typeof task.estimated_hours !== 'number' || task.estimated_hours < 0) {
     alert('Estimated hours must be a positive number.');
     return false;
   }
-
   return true;
+}
+
+/**
+ * Updates the type badge in the drawer header.
+ */
+function updateTypeBadge() {
+  const typeBadge = document.getElementById('drawer-type-badge');
+  if (typeBadge && currentTask) {
+    const typeChar = currentTask.type.charAt(0).toUpperCase();
+    typeBadge.textContent = typeChar;
+    typeBadge.className = `drawer-type-badge type-${typeChar}`;
+  }
+}
+
+/**
+ * Handles field changes for auto-save.
+ * @param {Event} e - The event (blur, change, or input).
+ */
+function handleFieldChange(e) {
+  if (!currentTask) return;
+  const field = e.target.dataset.field;
+  if (!field) return;
+
+  let value = e.target.value;
+
+  // Handle date synchronization
+  if (field === 'start_date' || field === 'end_date') {
+    if (field === 'start_date') {
+      const oldStartDate = currentTask.start_date ? new Date(currentTask.start_date) : null;
+      const oldEndDate = currentTask.end_date ? new Date(currentTask.end_date) : null;
+      const newStartDate = new Date(value);
+
+      // Always update start date
+      currentTask.start_date = value;
+
+      // Shift end date if it exists and dates are valid
+      if (oldStartDate && oldEndDate && !isNaN(newStartDate.getTime())) {
+        const delta = newStartDate.getTime() - oldStartDate.getTime();
+        const newEndDate = new Date(oldEndDate.getTime() + delta);
+        currentTask.end_date = newEndDate.toISOString().split('T')[0];
+        const endInput = document.getElementById('task-end-date');
+        if (endInput) endInput.value = currentTask.end_date;
+      }
+    } else if (field === 'end_date') {
+      const newEndDate = new Date(value);
+      const currentStartDate = currentTask.start_date ? new Date(currentTask.start_date) : null;
+
+      if (currentStartDate && !isNaN(newEndDate.getTime()) && !isNaN(currentStartDate.getTime())) {
+        if (newEndDate < currentStartDate) {
+          alert('End date cannot be before start date.');
+          const endInput = document.getElementById('task-end-date');
+          if (endInput) endInput.value = currentTask.end_date || '';
+          return; // Blocks save
+        }
+      }
+      currentTask.end_date = value;
+    }
+  }
+
+  // Convert and assign value to currentTask
+  switch (field) {
+    case 'title':
+    case 'notes':
+    case 'type':
+    case 'prio':
+      currentTask[field] = value;
+      break;
+    case 'parent_id':
+      currentTask.parent_id = value || null;
+      break;
+    case 'color':
+      currentTask.color = value || null;
+      break;
+    case 'estimated_hours':
+      currentTask.estimated_hours = parseFloat(value) || 0;
+      break;
+    case 'completion_manual':
+      currentTask.completion_manual = Math.min(1, Math.max(0, parseFloat(value) / 100));
+      // Update the percentage display
+      const pctDisplay = document.querySelector('.pct-display');
+      if (pctDisplay) {
+        pctDisplay.textContent = `${Math.round(currentTask.completion_manual * 100)}%`;
+      }
+      break;
+    default:
+      break;
+  }
+
+  // Update type badge if type changed
+  if (field === 'type') updateTypeBadge();
+
+  // Validate and save
+  if (validateTaskForSave(currentTask)) {
+    onTaskUpdated(currentTask);
+  }
 }
 
 // ============================================================================
@@ -111,6 +212,15 @@ function initDrawer(element, state) {
   titleInput.id = 'drawer-title-input';
   titleInput.type = 'text';
   titleInput.placeholder = 'Task title...';
+  titleInput.dataset.field = 'title'; // NEW: Mark for auto-save
+  // NEW: Auto-save on blur or Enter
+  titleInput.addEventListener('blur', handleFieldChange);
+  titleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      handleFieldChange(e);
+      titleInput.blur();
+    }
+  });
   head.appendChild(titleInput);
 
   // Head actions (Delete + Close)
@@ -128,9 +238,13 @@ function initDrawer(element, state) {
     </svg>
   `;
   deleteBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to delete this task?')) {
-      onTaskDeleted(currentTask.id);
-      closeDrawer();
+    if (currentTask.type === 'group') {
+      showGroupDeleteDialog(currentTask);
+    } else {
+      if (confirm('Are you sure you want to delete this task?')) {
+        onTaskDeleted(currentTask.id);
+        closeDrawer();
+      }
     }
   });
   headActions.appendChild(deleteBtn);
@@ -171,25 +285,14 @@ function initDrawer(element, state) {
   discardBtn.addEventListener('click', closeDrawer);
   footer.appendChild(discardBtn);
 
-  // Save button
+  // Save button (kept for backward compatibility)
   const saveBtn = document.createElement('button');
   saveBtn.className = 'dbtn save';
   saveBtn.textContent = 'Save changes';
   saveBtn.addEventListener('click', () => {
-    if (validateForm()) {
-      onTaskUpdated({
-        ...currentTask,
-        title: document.getElementById('drawer-title-input').value,
-        type: document.getElementById('task-type').value,
-        parent_id: document.getElementById('task-parent').value || null,
-        start_date: document.getElementById('task-start-date').value,
-        end_date: document.getElementById('task-end-date').value,
-        estimated_hours: parseFloat(document.getElementById('task-hours').value) || 0,
-        prio: document.getElementById('task-priority').value,
-        people_ids: currentTask.people_ids, // Preserve existing (editing not implemented yet)
-        notes: document.getElementById('task-notes').value,
-        completion_manual: parseFloat(document.getElementById('completion-slider').value) / 100
-      });
+    if (!currentTask) return;
+    if (validateTaskForSave(currentTask)) {
+      onTaskUpdated(currentTask);
     }
   });
   footer.appendChild(saveBtn);
@@ -206,6 +309,7 @@ function initDrawer(element, state) {
 function updateDrawerForTask(task, project) {
   currentTask = task;
   currentProject = project;
+  sliderTouched = false;
   bindTaskToForm();
   openDrawer();
 }
@@ -217,11 +321,7 @@ function bindTaskToForm() {
   if (!currentTask || !currentProject) return;
 
   // Update header
-  const typeBadge = document.getElementById('drawer-type-badge');
-  const typeChar = currentTask.type.charAt(0).toUpperCase();
-  typeBadge.textContent = typeChar;
-  typeBadge.className = `drawer-type-badge type-${typeChar}`;
-
+  updateTypeBadge();
   document.getElementById('drawer-title-input').value = currentTask.title;
 
   // Clear and rebuild body
@@ -241,6 +341,8 @@ function bindTaskToForm() {
   const typeSelect = document.createElement('select');
   typeSelect.className = 'd-input';
   typeSelect.id = 'task-type';
+  typeSelect.dataset.field = 'type'; // NEW: Mark for auto-save
+  typeSelect.addEventListener('change', handleFieldChange); // NEW: Auto-save on change
   ['task', 'group', 'milestone'].forEach(type => {
     const option = document.createElement('option');
     option.value = type;
@@ -259,6 +361,8 @@ function bindTaskToForm() {
   const parentSelect = document.createElement('select');
   parentSelect.className = 'd-input';
   parentSelect.id = 'task-parent';
+  parentSelect.dataset.field = 'parent_id'; // NEW
+  parentSelect.addEventListener('change', handleFieldChange); // NEW
   const noneOption = document.createElement('option');
   noneOption.value = '';
   noneOption.textContent = 'None';
@@ -290,6 +394,8 @@ function bindTaskToForm() {
   startInput.type = 'date';
   startInput.className = 'd-input';
   startInput.id = 'task-start-date';
+  startInput.dataset.field = 'start_date'; // NEW
+  startInput.addEventListener('change', handleFieldChange); // NEW
   startInput.value = currentTask.start_date;
   col2.appendChild(startInput);
 
@@ -303,6 +409,8 @@ function bindTaskToForm() {
   endInput.type = 'date';
   endInput.className = 'd-input';
   endInput.id = 'task-end-date';
+  endInput.dataset.field = 'end_date'; // NEW
+  endInput.addEventListener('change', handleFieldChange); // NEW
   endInput.value = currentTask.end_date;
   col2.appendChild(endInput);
 
@@ -325,18 +433,16 @@ function bindTaskToForm() {
   slider.type = 'range';
   slider.min = '0';
   slider.max = '100';
-  slider.value = Math.round((currentTask.completion_manual || 0) * 100);
+  slider.value = Math.round((currentTask.completion_manual ?? 0) * 100);
   slider.id = 'completion-slider';
+  slider.dataset.field = 'completion_manual'; // NEW
+  slider.addEventListener('input', handleFieldChange); // NEW: Auto-save on input (real-time)
   pctField.appendChild(slider);
 
   const pctDisplay = document.createElement('span');
   pctDisplay.className = 'pct-display';
   pctDisplay.textContent = `${slider.value}%`;
   pctField.appendChild(pctDisplay);
-
-  slider.addEventListener('input', () => {
-    pctDisplay.textContent = `${slider.value}%`;
-  });
 
   col3.appendChild(pctField);
   body.appendChild(col3);
@@ -356,7 +462,16 @@ function bindTaskToForm() {
   hoursInput.type = 'number';
   hoursInput.className = 'd-input';
   hoursInput.id = 'task-hours';
+  hoursInput.dataset.field = 'estimated_hours'; // NEW
   hoursInput.value = currentTask.estimated_hours || 0;
+  // NEW: Auto-save on blur or Enter
+  hoursInput.addEventListener('blur', handleFieldChange);
+  hoursInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      handleFieldChange(e);
+      hoursInput.blur();
+    }
+  });
   col4.appendChild(hoursInput);
 
   // Priority
@@ -368,6 +483,8 @@ function bindTaskToForm() {
   const prioSelect = document.createElement('select');
   prioSelect.className = 'd-input';
   prioSelect.id = 'task-priority';
+  prioSelect.dataset.field = 'prio'; // NEW
+  prioSelect.addEventListener('change', handleFieldChange); // NEW
   ['critical', 'high', 'normal', 'low'].forEach(prio => {
     const option = document.createElement('option');
     option.value = prio;
@@ -376,6 +493,35 @@ function bindTaskToForm() {
     prioSelect.appendChild(option);
   });
   col4.appendChild(prioSelect);
+
+  // Color
+  const colorLabel = document.createElement('div');
+  colorLabel.className = 'field-label';
+  colorLabel.textContent = 'Color';
+  col4.appendChild(colorLabel);
+
+  const colorSelect = document.createElement('select');
+  colorSelect.className = 'd-input';
+  colorSelect.id = 'task-color';
+  colorSelect.dataset.field = 'color'; // NEW
+  colorSelect.addEventListener('change', handleFieldChange); // NEW
+
+  // Default option (null)
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Default';
+  if (currentTask.color === null || currentTask.color === undefined) defaultOption.selected = true;
+  colorSelect.appendChild(defaultOption);
+
+  // Palette colors
+  Object.keys(PALETTE).forEach(color => {
+    const option = document.createElement('option');
+    option.value = color;
+    option.textContent = color;
+    if (color === currentTask.color) option.selected = true;
+    colorSelect.appendChild(option);
+  });
+  col4.appendChild(colorSelect);
 
   body.appendChild(col4);
   body.appendChild(createFieldSep());
@@ -393,7 +539,6 @@ function bindTaskToForm() {
   peopleContainer.className = 'people-chips';
 
   if (currentTask.people_ids?.length > 0) {
-    // Show chips for assigned people
     currentTask.people_ids.forEach(personId => {
       const person = currentProject.people?.find(p => p.id === personId);
       if (person) {
@@ -410,7 +555,6 @@ function bindTaskToForm() {
       }
     });
   } else {
-    // Show + button if no people assigned
     const addBtn = document.createElement('button');
     addBtn.className = 'chip chip-add';
     addBtn.textContent = '+ Add';
@@ -434,7 +578,16 @@ function bindTaskToForm() {
   const notesTextarea = document.createElement('textarea');
   notesTextarea.className = 'd-textarea';
   notesTextarea.id = 'task-notes';
+  notesTextarea.dataset.field = 'notes'; // NEW
   notesTextarea.value = currentTask.notes || '';
+  // NEW: Auto-save on blur or Enter
+  notesTextarea.addEventListener('blur', handleFieldChange);
+  notesTextarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      handleFieldChange(e);
+      notesTextarea.blur();
+    }
+  });
   col6.appendChild(notesTextarea);
 
   body.appendChild(col6);
@@ -479,6 +632,73 @@ function onTaskDeleted(taskId) {
 function refreshDrawer() {
   if (!isOpen || !currentTask || !_state?.project) return;
   updateDrawerForTask(currentTask, _state.project);
+}
+
+/**
+ * Shows a dialog for deleting a group task with options.
+ * @param {Task} task - The group task to delete.
+ */
+function showGroupDeleteDialog(task) {
+  const modal = document.createElement('div');
+  modal.className = 'delete-group-modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <p>Delete "${task.title}"?</p>
+      <div class="modal-options">
+        <button class="modal-btn delete-all">Delete group and all subtasks</button>
+        <button class="modal-btn dissolve">Dissolve group (keep subtasks)</button>
+        <button class="modal-btn cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  Object.assign(modal.style, {
+    position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+    background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center',
+    alignItems: 'center', zIndex: '10000'
+  });
+
+  const content = modal.querySelector('.modal-content');
+  Object.assign(content.style, {
+    background: '#fff', padding: '1.5rem', borderRadius: '8px',
+    maxWidth: '400px', width: '90%', textAlign: 'center'
+  });
+
+  content.querySelector('p').style.margin = '0 0 1.5rem';
+
+  const options = modal.querySelector('.modal-options');
+  Object.assign(options.style, {
+    display: 'flex', flexDirection: 'column', gap: '0.75rem'
+  });
+
+  const styleButton = (btn) => Object.assign(btn.style, {
+    padding: '0.5rem 1rem', border: 'none', borderRadius: '4px',
+    cursor: 'pointer', fontSize: '0.875rem'
+  });
+
+  Object.assign(modal.querySelector('.delete-all').style, { background: '#c0392b', color: '#fff' });
+  Object.assign(modal.querySelector('.dissolve').style, { background: '#3498db', color: '#fff' });
+  Object.assign(modal.querySelector('.cancel').style, { background: '#ecf0f1', color: '#2c3e50' });
+
+  [modal.querySelector('.delete-all'), modal.querySelector('.dissolve'), modal.querySelector('.cancel')]
+    .forEach(styleButton);
+
+  modal.querySelector('.delete-all').addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('taskDeletedWithChildren', { detail: task.id }));
+    closeDrawer();
+    modal.remove();
+  });
+
+  modal.querySelector('.dissolve').addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('taskDissolved', { detail: task.id }));
+    closeDrawer();
+    modal.remove();
+  });
+
+  modal.querySelector('.cancel').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+  document.body.appendChild(modal);
 }
 
 // ============================================================================

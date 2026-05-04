@@ -27,7 +27,7 @@
  * @returns {Task[]} Array of child tasks
  */
 function getChildren(taskId, tasks) {
-  return tasks.filter(task => task.parentId === taskId);
+  return tasks.filter(task => task.parent_id === taskId);
 }
 
 /**
@@ -53,8 +53,8 @@ function getDescendants(taskId, tasks) {
  */
 function getSiblings(taskId, tasks) {
   const task = tasks.find(t => t.id === taskId);
-  if (!task || !task.parentId) return [];
-  return tasks.filter(t => t.parentId === task.parentId && t.id !== taskId);
+  if (!task || !task.parent_id) return [];
+  return tasks.filter(t => t.parent_id === task.parent_id && t.id !== taskId);
 }
 
 /**
@@ -70,7 +70,7 @@ function getPath(taskId, tasks) {
     const currentTask = tasks.find(t => t.id === currentId);
     if (!currentTask) break;
     path.unshift(currentTask);
-    currentId = currentTask.parentId;
+    currentId = currentTask.parent_id;
   }
   return path;
 }
@@ -81,7 +81,7 @@ function getPath(taskId, tasks) {
  * @returns {Task[]} Array of root tasks
  */
 function getRootTasks(tasks) {
-  return tasks.filter(task => !task.parentId);
+  return tasks.filter(task => !task.parent_id);
 }
 
 // ============================================================================
@@ -254,6 +254,57 @@ function aggregateByTask(entries) {
 }
 
 /**
+ * Computes completion_derived for all tasks in a project.
+ * - Uses completion_manual if set (assumed sanitized 0-1)
+ * - For tasks/milestones: min(hours_spent / estimated_hours, 0.99)
+ * - For groups: average of children's (completion_manual || completion_derived)
+ * @param {Project} project - Project to update
+ * @returns {Project} Project with completion_derived populated
+ */
+function computeAllCompletions(project) {
+  const taskMap = new Map(project.tasks.map(task => [task.id, task]));
+  const completionCache = new Map();
+
+  function getCompletion(taskId) {
+    if (completionCache.has(taskId)) return completionCache.get(taskId);
+
+    const task = taskMap.get(taskId);
+    if (!task) return completionCache.set(taskId, 0).get(taskId);
+
+    // For groups: ALWAYS compute from children (ignore manual)
+    if (task.type === 'group') {
+      const children = project.tasks.filter(t => t.parent_id === task.id);
+      if (children.length === 0) return completionCache.set(taskId, 0).get(taskId);
+      const sum = children.reduce((acc, child) => acc + getCompletion(child.id), 0);
+      return completionCache.set(taskId, sum / children.length).get(taskId);
+    }
+
+    // For tasks/milestones: use manual if set, otherwise compute
+    if (task.completion_manual !== null && task.completion_manual !== undefined) {
+      return completionCache.set(taskId, task.completion_manual).get(taskId);
+    }
+
+    // Tasks/milestones: hours spent / estimated hours (capped at 99%)
+    if (task.type === 'task' || task.type === 'milestone') {
+      const hoursSpent = task.hours_spent || 0;
+      const estimatedHours = task.estimated_hours || 0;
+      const value = estimatedHours === 0 ? 0 : Math.min(hoursSpent / estimatedHours, 0.99);
+      return completionCache.set(taskId, value).get(taskId);
+    }
+
+    return completionCache.set(taskId, 0).get(taskId);
+  }
+
+  return {
+    ...project,
+    tasks: project.tasks.map(task => ({
+      ...task,
+      completion_derived: getCompletion(task.id)
+    }))
+  };
+}
+
+/**
  * Rebuild all derived fields in the project (e.g., hours_spent, completion_derived).
  * @param {Project} project - Project to rebuild
  * @param {WorkEntry[]} worklogEntries - Array of worklog entries
@@ -276,10 +327,10 @@ function rebuildSnapshots(project, worklogEntries) {
     };
   });
 
-  return {
+  return computeAllCompletions({
     ...project,
-    tasks: updatedTasks,
-  };
+    tasks: updatedTasks
+  });
 }
 
 // ============================================================================

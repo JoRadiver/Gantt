@@ -88,9 +88,75 @@ body {
   color: var(--accent-blue);
 }
 
-.project-name {
+.project-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-name-input {
   font-size: 14px;
   color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  width: 150px;
+  min-width: 50px;
+}
+
+.project-name-input:focus {
+  outline: none;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+}
+
+.edit-placeholder, .edit-icon {
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+.edit-placeholder {
+  color: transparent;
+  cursor: default;
+}
+
+.edit-icon {
+  display: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.project-name-input:hover ~ .edit-placeholder {
+  display: none;
+}
+
+.project-name-input:hover ~ .edit-icon {
+  display: inline;
+}
+
+.project-date-input {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 100px;
+  height: 24px;
+}
+
+.project-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.date-separator {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 0 4px;
 }
 
 .header-right {
@@ -1154,3 +1220,133 @@ select.d-input option {
   border: 1px solid #235e3e;
 }
 
+/* Color dropdown with swatches using existing CSS variables */
+#task-color option {
+  padding-left: 24px;
+  position: relative;
+}
+
+#task-color option[value="green"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-green);
+}
+
+#task-color option[value="blue"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-blue);
+}
+
+#task-color option[value="teal"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: #20c997; /* Teal not in CSS vars */
+}
+
+#task-color option[value="purple"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-purple);
+}
+
+#task-color option[value="amber"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-amber);
+}
+
+#task-color option[value="coral"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-coral);
+}
+
+#task-color option[value="slate"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-slate);
+}
+
+#task-color option[value="orange"]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--accent-orange);
+}
+
+/* Default option */
+#task-color option[value=""]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--border-secondary);
+  border: 1px dashed var(--text-tertiary);
+}
+
+/* ============================================================================
+   Drag and Drop Styles
+============================================================================ */
+.task-row.drag-over {
+  background-color: var(--bg-tertiary) !important;
+}
+
+.task-row.drop-above {
+  border-top: 3px solid #ffa500 !important;
+}
+
+.task-row.dragging {
+  opacity: 0.5;
+}

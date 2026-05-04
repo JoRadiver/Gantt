@@ -6,6 +6,10 @@ let taskListElement = null;
 let selectedTaskId = null;
 let tasks = [];
 let _state = null; // Reference to global app state
+// Drag and drop state
+let draggedTaskId = null;
+let dropTargetId = null;
+let dropPosition = null; // 'on' or 'above'
 
 // ============================================================================
 // DOM HELPERS
@@ -30,6 +34,158 @@ function getIndentLevel(task, allTasks) {
  */
 function getChildren(parentId, allTasks) {
   return allTasks.filter(t => t.parent_id === parentId);
+}
+
+/**
+ * Checks if taskA is a descendant of taskB in the task tree.
+ */
+function isDescendant(taskAId, taskBId, allTasks) {
+  if (taskAId === taskBId) return false;
+  let currentId = taskAId;
+  while (currentId) {
+    const current = allTasks.find(t => t.id === currentId);
+    if (!current) break;
+    if (current.parent_id === taskBId) return true;
+    currentId = current.parent_id;
+  }
+  return false;
+}
+
+/**
+ * Checks if reparenting would create a cycle.
+ */
+function wouldCreateDragCycle(draggedTask, targetTask, position) {
+  if (!draggedTask || !targetTask) return false;
+  if (draggedTask.id === targetTask.id) return true;
+
+  const newParentId = position === 'on' && targetTask.type === 'group'
+    ? targetTask.id
+    : position === 'above'
+      ? targetTask.parent_id
+      : null;
+
+  if (!newParentId) return false;
+  return isDescendant(newParentId, draggedTask.id, tasks);
+}
+
+/**
+ * Clears visual drag feedback.
+ */
+function clearDragFeedback() {
+  document.querySelectorAll('.task-row.drag-over').forEach(row => {
+    row.classList.remove('drag-over', 'drop-above');
+  });
+  document.querySelectorAll('.task-row.dragging').forEach(row => {
+    row.classList.remove('dragging');
+  });
+}
+
+/**
+ * Clears drag state.
+ */
+function clearDragState() {
+  draggedTaskId = null;
+  dropTargetId = null;
+  dropPosition = null;
+}
+
+/**
+ * Handles drag start event.
+ */
+function handleDragStart(e, taskId) {
+  draggedTaskId = taskId;
+  e.dataTransfer.setData('text/plain', taskId);
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.classList.add('dragging');
+  e.stopPropagation();
+}
+
+/**
+ * Handles drag over event.
+ */
+function handleDragOver(e, targetTaskId) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (draggedTaskId === targetTaskId) return;
+
+  const targetRow = e.currentTarget;
+  const rect = targetRow.getBoundingClientRect();
+  const nearTop = e.clientY - rect.top < rect.height / 3;
+
+  if (dropTargetId !== targetTaskId || dropPosition !== (nearTop ? 'above' : 'on')) {
+    clearDragFeedback();
+    dropTargetId = targetTaskId;
+    dropPosition = nearTop ? 'above' : 'on';
+    targetRow.classList.add('drag-over');
+    if (nearTop) targetRow.classList.add('drop-above');
+  }
+  e.stopPropagation();
+}
+
+/**
+ * Handles drag leave event.
+ */
+function handleDragLeave(e, targetTaskId) {
+  if (dropTargetId === targetTaskId) {
+    clearDragFeedback();
+    dropTargetId = null;
+    dropPosition = null;
+  }
+  e.stopPropagation();
+}
+
+/**
+ * Handles drop event.
+ */
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedTaskId || !dropTargetId) {
+    clearDragState();
+    return;
+  }
+
+  const draggedTask = tasks.find(t => t.id === draggedTaskId);
+  const targetTask = tasks.find(t => t.id === dropTargetId);
+
+  if (!draggedTask || !targetTask) {
+    console.error('Drag or drop task not found');
+    clearDragState();
+    return;
+  }
+
+  if (wouldCreateDragCycle(draggedTask, targetTask, dropPosition)) {
+    console.error('Cannot create circular hierarchy');
+    clearDragState();
+    return;
+  }
+
+  if (dropPosition === 'on') {
+    if (targetTask.type === 'group') {
+      window.dispatchEvent(new CustomEvent('moveTaskToGroup', {
+        detail: { taskId: draggedTaskId, groupId: dropTargetId }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('createGroupFromTasks', {
+        detail: { taskId1: draggedTaskId, taskId2: dropTargetId }
+      }));
+    }
+  } else if (dropPosition === 'above') {
+    window.dispatchEvent(new CustomEvent('makeSiblingBefore', {
+      detail: { taskId: draggedTaskId, beforeTaskId: dropTargetId }
+    }));
+  }
+
+  clearDragState();
+}
+
+/**
+ * Handles drag end event.
+ */
+function handleDragEnd(e) {
+  clearDragFeedback();
+  clearDragState();
+  e.stopPropagation();
 }
 
 /**
@@ -100,16 +256,22 @@ function createTaskRow(task, project) {
   // --- Completion Cell ---
   const pctCell = document.createElement('div');
   pctCell.className = 'cell cell-pct';
+
+  // Use manual completion if set, otherwise derived
+  const completion = task.completion_manual !== null && task.completion_manual !== undefined
+    ? task.completion_manual
+    : (task.completion_derived || 0);
+
   const pctVal = document.createElement('span');
   pctVal.className = 'pct-val';
-  pctVal.textContent = `${Math.round((task.completion_derived || 0) * 100)}%`;
+  pctVal.textContent = `${Math.round(completion * 100)}%`;
   pctCell.appendChild(pctVal);
 
   const pctBar = document.createElement('div');
   pctBar.className = 'pct-bar';
   const pctFill = document.createElement('div');
-  pctFill.className = `pct-fill ${(task.completion_derived || 0) >= 1 ? 'done' : (task.completion_derived || 0) < 0.3 ? 'low' : ''}`;
-  pctFill.style.width = `${(task.completion_derived || 0) * 100}%`;
+  pctFill.className = `pct-fill ${completion >= 1 ? 'done' : completion < 0.3 ? 'low' : ''}`;
+  pctFill.style.width = `${completion * 100}%`;
   pctBar.appendChild(pctFill);
   pctCell.appendChild(pctBar);
   row.appendChild(pctCell);
@@ -153,6 +315,12 @@ function createTaskRow(task, project) {
 
   // --- Click Handler ---
   row.addEventListener('click', () => onTaskSelected(task.id));
+  row.draggable = true;
+  row.addEventListener('dragstart', (e) => handleDragStart(e, task.id));
+  row.addEventListener('dragover', (e) => handleDragOver(e, task.id));
+  row.addEventListener('dragleave', (e) => handleDragLeave(e, task.id));
+  row.addEventListener('drop', (e) => handleDrop(e, task.id));
+  row.addEventListener('dragend', handleDragEnd);
 
   return row;
 }
@@ -161,7 +329,6 @@ function createTaskRow(task, project) {
  * Renders all visible tasks recursively.
  */
 function renderTasks(parentId = null, allTasks, project) {
-  console.log('Rendering tasks for parent:', parentId, 'Collapsed groups:',Array.from(_state?.collapsedGroups || []));
   const fragment = document.createDocumentFragment();
   const children = parentId
     ? allTasks.filter(t => t.parent_id === parentId)
@@ -218,6 +385,8 @@ function refreshSidebar(project) {
   tasks = project.tasks || [];
   taskListElement.innerHTML = '';
   taskListElement.appendChild(renderTasks(null, tasks, project));
+  clearDragState();
+  clearDragFeedback();
 }
 
 /**

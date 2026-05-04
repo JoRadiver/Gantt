@@ -16,9 +16,9 @@ import {
 } from './core.js';
 
 import {
-  getRootTasks, rollupGroup,
+  getRootTasks, rollupGroup, getChildren,
   computeEarliestStart, getDependencyShift, wouldCreateCycle,
-  aggregateByTask, rebuildSnapshots,
+  aggregateByTask, rebuildSnapshots, getDescendants,
   resolveColor
 } from './engine.js';
 
@@ -35,10 +35,18 @@ import { initCanvas, refreshCanvas as _refreshCanvas, setZoom as _setCanvasZoom,
 // ============================================================================
 
 function createDefaultProject() {
+  const today = new Date().toISOString().split('T')[0];
+  const end = new Date();
+  end.setDate(end.getDate() + 30);
+  const endStr = end.toISOString().split('T')[0];
+
   return {
     meta: {
       id: crypto.randomUUID(),
       name: 'Untitled Project',
+      description: '',
+      start_date: today,
+      end_date: endStr,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       default_task_color: 'green',
@@ -234,6 +242,29 @@ export function removeDependency(dependencyId) {
   refreshAll();
 }
 
+/**
+ * Checks if taskA is a descendant of taskB in the task tree.
+ */
+function isDescendantOf(taskAId, taskBId, tasks) {
+  if (taskAId === taskBId) return false;
+  let currentId = taskAId;
+  while (currentId) {
+    const current = tasks.find(t => t.id === currentId);
+    if (!current) break;
+    if (current.parent_id === taskBId) return true;
+    currentId = current.parent_id;
+  }
+  return false;
+}
+
+/**
+ * Checks if reparenting taskId to newParentId would create a cycle.
+ */
+function wouldCreateParentCycle(taskId, newParentId, tasks) {
+  if (!newParentId) return false; // Moving to root is safe
+  return isDescendantOf(newParentId, taskId, tasks);
+}
+
 // ============================================================================
 // WORKLOG OPERATIONS
 // ============================================================================
@@ -311,8 +342,20 @@ export function refreshDrawer() {
 // ============================================================================
 
 function updateHeader() {
-  const nameEl = document.querySelector('.project-name');
-  if (nameEl) nameEl.textContent = state.project?.meta?.name ?? 'Untitled Project';
+  const nameEl = document.querySelector('#project-name-input');
+  if (nameEl) nameEl.value = state.project?.meta?.name ?? 'Untitled Project';
+
+  const startDateEl = document.querySelector('#project-start-date');
+  const endDateEl = document.querySelector('#project-end-date');
+  if (startDateEl) startDateEl.value = state.project?.meta?.start_date ?? '';
+  if (endDateEl) endDateEl.value = state.project?.meta?.end_date ?? '';
+}
+
+function updateProjectMeta(updates) {
+  state.project.meta = { ...state.project.meta, ...updates };
+  state.project.meta.updated_at = new Date().toISOString();
+  updateHeader();
+  refreshAll();
 }
 
 function updateStatusBar() {
@@ -415,6 +458,23 @@ function registerWindowEvents() {
     deleteTask(taskId);
   });
 
+  window.addEventListener('taskDissolved', e => {
+    const groupId = e.detail;
+    if (!groupId) return;
+
+    const group = state.project.tasks.find(t => t.id === groupId);
+    if (!group) return;
+
+    // Reparent all direct children to the group's parent
+    const children = getChildren(groupId, state.project.tasks);
+    children.forEach(child => {
+      child.parent_id = group.parent_id;
+    });
+
+    // Now delete the group
+    deleteTask(groupId);
+  });
+
   // Sidebar dispatches 'taskSelected' when a row is clicked
   window.addEventListener('taskSelected', e => {
     const taskId = e.detail;
@@ -443,6 +503,141 @@ function registerWindowEvents() {
     refreshCanvas();
   });
 
+  // Drag and drop event handlers
+  window.addEventListener('moveTaskToGroup', e => {
+    const { taskId, groupId } = e.detail;
+    const task = state.project.tasks.find(t => t.id === taskId);
+    const group = state.project.tasks.find(t => t.id === groupId);
+    if (!task || !group) {
+      console.error('Task or group not found');
+      return;
+    }
+    if (group.type !== 'group') {
+      console.error('Target is not a group');
+      return;
+    }
+    if (task.id === group.id) {
+      console.error('Cannot move task into itself');
+      return;
+    }
+    if (wouldCreateParentCycle(taskId, groupId, state.project.tasks)) {
+      console.error('Cannot create circular hierarchy');
+      return;
+    }
+    task.parent_id = groupId;
+    state.project = rebuildSnapshots(state.project, state.worklog);
+    refreshAll();
+  });
+
+  window.addEventListener('createGroupFromTasks', e => {
+    const { taskId1, taskId2 } = e.detail;
+    const task1 = state.project.tasks.find(t => t.id === taskId1);
+    const task2 = state.project.tasks.find(t => t.id === taskId2);
+    if (!task1 || !task2) {
+      console.error('One or both tasks not found');
+      return;
+    }
+    if (task1.type === 'group' || task2.type === 'group') {
+      console.error('Cannot create group from a group task');
+      return;
+    }
+    if (task1.id === task2.id) {
+      console.error('Cannot create group from the same task');
+      return;
+    }
+    if (isDescendantOf(task1.id, task2.id, state.project.tasks) ||
+      isDescendantOf(task2.id, task1.id, state.project.tasks)) {
+      console.error('Cannot create circular hierarchy');
+      return;
+    }
+
+    // Group gets the same parent as task2
+    const groupParentId = task2.parent_id;
+
+    // Find the original indices of both tasks
+    const task1Index = state.project.tasks.findIndex(t => t.id === taskId1);
+    const task2Index = state.project.tasks.findIndex(t => t.id === taskId2);
+
+    // Create new group
+    const newGroup = {
+      id: crypto.randomUUID(),
+      type: 'group',
+      title: 'Group',
+      notes: '',
+      parent_id: groupParentId,
+      people_ids: [],
+      color: null,
+      start_date: task1.start_date,
+      estimated_hours: 0,
+      end_date: task1.end_date,
+      end_date_is_flexible: true,
+      end_date_flexibility_range: 0,
+      end_date_is_last_of_children: false,
+      prio: 'normal',
+      hours_spent: 0,
+      completion_derived: 0,
+      completion_manual: null,
+      conflict_state: 'none',
+    };
+
+    // Remove both tasks from their current positions (higher index first to avoid shifting)
+    const indicesToRemove = [task1Index, task2Index].filter(i => i !== -1).sort((a, b) => b - a);
+    indicesToRemove.forEach(idx => state.project.tasks.splice(idx, 1));
+
+    // Insert the new group at task2's original position
+    state.project.tasks.splice(task2Index, 0, newGroup);
+
+    // Insert both tasks right after the new group (so they appear as children in order)
+    state.project.tasks.splice(task2Index + 1, 0, task1, task2);
+
+    // Reparent both tasks to the new group
+    task1.parent_id = newGroup.id;
+    task2.parent_id = newGroup.id;
+
+    state.project = rebuildSnapshots(state.project, state.worklog);
+    refreshAll();
+  });
+
+  window.addEventListener('makeSiblingBefore', e => {
+    const { taskId, beforeTaskId } = e.detail;
+    const task = state.project.tasks.find(t => t.id === taskId);
+    const beforeTask = state.project.tasks.find(t => t.id === beforeTaskId);
+    if (!task || !beforeTask) {
+      console.error('Task or beforeTask not found');
+      return;
+    }
+    if (task.id === beforeTask.id) {
+      console.error('Cannot make task sibling of itself');
+      return;
+    }
+
+    const newParentId = beforeTask.parent_id;
+    if (wouldCreateParentCycle(taskId, newParentId, state.project.tasks)) {
+      console.error('Cannot create circular hierarchy');
+      return;
+    }
+
+    // Remove task from current position
+    const taskIndex = state.project.tasks.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+      state.project.tasks.splice(taskIndex, 1);
+    }
+
+    // Set new parent
+    task.parent_id = newParentId;
+
+    // Insert before beforeTask in the array
+    const beforeIndex = state.project.tasks.findIndex(t => t.id === beforeTaskId);
+    if (beforeIndex !== -1) {
+      state.project.tasks.splice(beforeIndex, 0, task);
+    } else {
+      state.project.tasks.push(task);
+    }
+
+    state.project = rebuildSnapshots(state.project, state.worklog);
+    refreshAll();
+  });
+
   // Worklog dispatches 'worklogEntryAdded'
   window.addEventListener('worklogEntryAdded', e => {
     const entry = e.detail;
@@ -465,6 +660,27 @@ function registerWindowEvents() {
       state.project = rebuildSnapshots(state.project, state.worklog);
       _refreshSidebar(state.project);
     }
+  });
+
+  window.addEventListener('taskDeletedWithChildren', e => {
+    const taskId = e.detail;
+    if (!taskId) return;
+
+    const descendants = getDescendants(taskId, state.project.tasks);
+    const allTaskIds = [taskId, ...descendants.map(t => t.id)];
+
+    state.project.tasks = state.project.tasks.filter(t => !allTaskIds.includes(t.id));
+    state.project.dependencies = state.project.dependencies.filter(
+      d => !allTaskIds.includes(d.from_task_id) && !allTaskIds.includes(d.to_task_id)
+    );
+
+    if (state.selectedTaskId && allTaskIds.includes(state.selectedTaskId)) {
+      state.selectedTaskId = null;
+    }
+
+    state.project = rebuildSnapshots(state.project, state.worklog);
+    refreshAll();
+    updateStatusBar();
   });
 }
 
@@ -523,6 +739,23 @@ function wireDOMEvents() {
     refreshSidebar();
     refreshCanvas();
   });
+
+  // Project meta editing
+  document.getElementById('project-name-input')?.addEventListener('input', e => {
+    updateProjectMeta({ name: e.target.value });
+  });
+
+  document.getElementById('project-start-date')?.addEventListener('change', e => {
+    updateProjectMeta({ start_date: e.target.value });
+  });
+
+  document.getElementById('project-end-date')?.addEventListener('change', e => {
+    updateProjectMeta({ end_date: e.target.value });
+  });
+
+  document.querySelector('.edit-icon')?.addEventListener('click', () => {
+    document.getElementById('project-name-input')?.focus();
+  });
 }
 
 // ============================================================================
@@ -543,12 +776,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (worklogEl) initWorklog(worklogEl, state);
   if (canvasEl)  initCanvas(canvasEl, state);
 
-  // 6. Wire DOM events (buttons, toggles, etc.)
   wireDOMEvents();
-
-  // 7. Wire cross-module events (e.g., taskUpdated, sidebarScroll)
   registerWindowEvents();
-
-  // 8. Initial render
   refreshAll();
+  updateHeader();
 });

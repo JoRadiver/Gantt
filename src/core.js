@@ -241,6 +241,9 @@ function defaultPerson() {
  */
 function defaultTask() {
   const today = new Date().toISOString().split('T')[0];
+  const end = new Date();
+  end.setDate(end.getDate() + 7);
+  const endStr = end.toISOString().split('T')[0];
   return {
     id: crypto.randomUUID(),
     type: 'task',
@@ -251,7 +254,7 @@ function defaultTask() {
     color: null,
     start_date: today,
     estimated_hours: 0,
-    end_date: today,
+    end_date: endStr,
     end_date_is_flexible: true,
     end_date_flexibility_range: 0,
     end_date_is_last_of_children: false,
@@ -344,4 +347,5 @@ export {
     defaultWorkEntry,
     getColorStop,
     getColorStops,
+    PALETTE,
 }

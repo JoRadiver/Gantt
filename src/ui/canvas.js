@@ -512,7 +512,7 @@ function _drawBars() {
     if (task.type === 'milestone') {
       _drawMilestone(task, rowY, range, dayPx, selectedId, scrollLeft);
     } else if (task.type === 'group') {
-      _drawGroupBar(task, rowY, range, dayPx, selectedId, showCritPath, scrollLeft);
+      _drawTaskBar(task, rowY, range, dayPx, selectedId, showCritPath, scrollLeft);
     } else {
       _drawTaskBar(task, rowY, range, dayPx, selectedId, showCritPath, scrollLeft);
     }
